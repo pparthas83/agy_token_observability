@@ -1,0 +1,12 @@
+{
+  "token-observability": {
+    "enabled": true,
+    "Stop": [
+      {
+        "type": "command",
+        "command": "./run_hook.sh",
+        "timeout": 30
+      }
+    ]
+  }
+}
