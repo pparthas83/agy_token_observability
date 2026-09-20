@@ -177,21 +177,39 @@ st.markdown(
     }
 
     /* Sleek Cards */
+    /* Base GCP Card */
     .gcp-card {
         background-color: #FFFFFF;
         border: 1px solid #DADCE0;
         border-radius: 8px;
-        padding: 16px 18px;
+        padding: 18px 20px;
         box-shadow: 0 1px 2px 0 rgba(60,64,67,0.1), 0 1px 3px 1px rgba(60,64,67,0.05);
         transition: all 0.2s ease-in-out;
-        min-height: 135px;
-        height: 135px;
+        box-sizing: border-box;
+    }
+    .gcp-card:hover {
+        box-shadow: 0 4px 12px 0 rgba(60,64,67,0.12);
+        border-color: #BDC1C6;
+    }
+
+    /* Standardized 5-Column KPI Metric Cards (Strict height & alignment) */
+    .kpi-card {
+        background-color: #FFFFFF;
+        border: 1px solid #DADCE0;
+        border-radius: 8px;
+        padding: 14px 16px;
+        box-shadow: 0 1px 2px 0 rgba(60,64,67,0.1), 0 1px 3px 1px rgba(60,64,67,0.05);
+        transition: all 0.2s ease-in-out;
+        height: 140px;
+        min-height: 140px;
+        max-height: 140px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         box-sizing: border-box;
+        overflow: hidden;
     }
-    .gcp-card:hover {
+    .kpi-card:hover {
         box-shadow: 0 4px 12px 0 rgba(60,64,67,0.12);
         border-color: #BDC1C6;
     }
@@ -208,7 +226,7 @@ st.markdown(
     }
 
     .kpi-title {
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         font-weight: 600;
         color: #5F6368;
         text-transform: uppercase;
@@ -231,13 +249,17 @@ st.markdown(
     }
 
     .kpi-icon-container {
-        width: 44px;
-        height: 44px;
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
+        font-size: 17px;
+        flex-shrink: 0;
+        box-sizing: border-box;
     }
 
     /* Executive Summary Banner */
@@ -710,16 +732,16 @@ try:
         with c1:
             st.html(
                 f"""
-                <div class="gcp-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <div class="kpi-title">Total Projects</div>
-                            <div class="kpi-value">{int(kpi['total_projects']):,}</div>
-                            <div class="pill pill-blue" style="margin-top: 8px;">Active Repos</div>
-                        </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Total Projects</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 2px 0;">
+                        <div class="kpi-value">{int(kpi['total_projects']):,}</div>
                         <div class="kpi-icon-container" style="background: #E8F0FE; color: #1A73E8;">
                             📁
                         </div>
+                    </div>
+                    <div style="margin-top: auto; padding-top: 4px;">
+                        <span class="pill pill-blue">Active Repos</span>
                     </div>
                 </div>
                 """
@@ -728,16 +750,16 @@ try:
         with c2:
             st.html(
                 f"""
-                <div class="gcp-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <div class="kpi-title">Total Workspaces</div>
-                            <div class="kpi-value">{int(kpi['total_workspaces']):,}</div>
-                            <div class="pill pill-blue" style="margin-top: 8px;">Workstation Dirs</div>
-                        </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Total Workspaces</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 2px 0;">
+                        <div class="kpi-value">{int(kpi['total_workspaces']):,}</div>
                         <div class="kpi-icon-container" style="background: #EEF0F8; color: #3F51B5;">
                             👥
                         </div>
+                    </div>
+                    <div style="margin-top: auto; padding-top: 4px;">
+                        <span class="pill pill-blue">Workstation Dirs</span>
                     </div>
                 </div>
                 """
@@ -746,16 +768,16 @@ try:
         with c3:
             st.html(
                 f"""
-                <div class="gcp-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <div class="kpi-title">Total Conversations</div>
-                            <div class="kpi-value">{int(kpi['total_conversations']):,}</div>
-                            <div class="pill pill-purple" style="margin-top: 8px;">{int(kpi['total_steps']):,} Turns</div>
-                        </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Total Conversations</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 2px 0;">
+                        <div class="kpi-value">{int(kpi['total_conversations']):,}</div>
                         <div class="kpi-icon-container" style="background: #F3E8FD; color: #8430CE;">
                             💬
                         </div>
+                    </div>
+                    <div style="margin-top: auto; padding-top: 4px;">
+                        <span class="pill pill-purple">{int(kpi['total_steps']):,} Turns</span>
                     </div>
                 </div>
                 """
@@ -764,16 +786,16 @@ try:
         with c4:
             st.html(
                 f"""
-                <div class="gcp-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <div class="kpi-title">Tokens Consumed</div>
-                            <div class="kpi-value">{kpi['grand_total_tokens'] / 1_000_000:.2f}M</div>
-                            <div class="pill pill-green" style="margin-top: 8px;">96.7% Context In</div>
-                        </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Tokens Consumed</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 2px 0;">
+                        <div class="kpi-value">{kpi['grand_total_tokens'] / 1_000_000:.2f}M</div>
                         <div class="kpi-icon-container" style="background: #E6F4EA; color: #137333;">
                             🪙
                         </div>
+                    </div>
+                    <div style="margin-top: auto; padding-top: 4px;">
+                        <span class="pill pill-green">96.7% Context In</span>
                     </div>
                 </div>
                 """
@@ -782,16 +804,16 @@ try:
         with c5:
             st.html(
                 f"""
-                <div class="gcp-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <div class="kpi-title">Total Cost Incurred</div>
-                            <div class="kpi-value" style="color: #1A73E8;">${kpi['total_spend_usd']:,.2f}</div>
-                            <div class="pill pill-amber" style="margin-top: 8px;">Avg ${(kpi['total_spend_usd'] / kpi['total_projects']):,.2f} / repo</div>
-                        </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Total Cost Incurred</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 2px 0;">
+                        <div class="kpi-value" style="color: #1A73E8;">${kpi['total_spend_usd']:,.2f}</div>
                         <div class="kpi-icon-container" style="background: #FEF7E0; color: #B06000;">
                             💲
                         </div>
+                    </div>
+                    <div style="margin-top: auto; padding-top: 4px;">
+                        <span class="pill pill-amber">Avg ${(kpi['total_spend_usd'] / max(1, kpi['total_projects'])):,.2f} / repo</span>
                     </div>
                 </div>
                 """
@@ -1095,7 +1117,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 with k1:
                     st.html(
                         f"""
-                        <div class="gcp-card">
+                        <div class="kpi-card">
                             <div>
                                 <div class="kpi-title">Session Spend</div>
                                 <div class="kpi-value" style="color: #1A73E8;">{spend_str}</div>
@@ -1109,7 +1131,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 with k2:
                     st.html(
                         f"""
-                        <div class="gcp-card">
+                        <div class="kpi-card">
                             <div>
                                 <div class="kpi-title">Total Tokens</div>
                                 <div class="kpi-value">{tokens_str}</div>
@@ -1123,7 +1145,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 with k3:
                     st.html(
                         f"""
-                        <div class="gcp-card">
+                        <div class="kpi-card">
                             <div>
                                 <div class="kpi-title">Cache Hit Rate</div>
                                 <div class="kpi-value" style="color: #137333;">{cache_hit_rate:.1f}%</div>
@@ -1137,7 +1159,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 with k4:
                     st.html(
                         f"""
-                        <div class="gcp-card">
+                        <div class="kpi-card">
                             <div>
                                 <div class="kpi-title">Cost Saved (Cache)</div>
                                 <div class="kpi-value" style="color: #137333;">{saved_str}</div>
@@ -1151,7 +1173,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 with k5:
                     st.html(
                         f"""
-                        <div class="gcp-card">
+                        <div class="kpi-card">
                             <div>
                                 <div class="kpi-title">Max Context Reached</div>
                                 <div class="kpi-value">{max_ctx_str}</div>
