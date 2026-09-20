@@ -181,30 +181,53 @@ st.markdown(
         background-color: #FFFFFF;
         border: 1px solid #DADCE0;
         border-radius: 8px;
-        padding: 18px 20px;
+        padding: 16px 18px;
         box-shadow: 0 1px 2px 0 rgba(60,64,67,0.1), 0 1px 3px 1px rgba(60,64,67,0.05);
         transition: all 0.2s ease-in-out;
+        min-height: 135px;
+        height: 135px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-sizing: border-box;
     }
     .gcp-card:hover {
         box-shadow: 0 4px 12px 0 rgba(60,64,67,0.12);
         border-color: #BDC1C6;
     }
 
+    /* Column equal stretch */
+    div[data-testid="column"] {
+        display: flex;
+        flex-direction: column;
+    }
+    div[data-testid="column"] > div {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
     .kpi-title {
-        font-size: 0.78rem;
+        font-size: 0.75rem;
         font-weight: 600;
         color: #5F6368;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
         font-family: 'Roboto', sans-serif;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .kpi-value {
-        font-size: 2.2rem;
+        font-size: 1.85rem;
         font-weight: 700;
         color: #202124;
         font-family: 'Google Sans', sans-serif;
         line-height: 1.1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .kpi-icon-container {
@@ -251,6 +274,19 @@ st.markdown(
         box-shadow: 0 1px 2px 0 rgba(60,64,67,0.1);
         overflow-x: auto;
     }
+    .gcp-scrollable-table {
+        max-height: 480px;
+        overflow-y: auto;
+        border: 1px solid #DADCE0;
+        border-radius: 6px;
+    }
+    .gcp-scrollable-table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #F8F9FA;
+        z-index: 5;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.08);
+    }
     .gcp-table {
         width: 100%;
         border-collapse: collapse;
@@ -285,6 +321,11 @@ st.markdown(
         border-radius: 12px;
         font-size: 11px;
         font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+        line-height: 1.2;
     }
     .pill-blue { background: #E8F0FE; color: #1967D2; }
     .pill-green { background: #E6F4EA; color: #137333; }
@@ -1002,7 +1043,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         st_time = pd.to_datetime(row["start_time"]).strftime("%b %d, %H:%M")
                         cached_k = float(row["cached_tokens"]) / 1000.0
                         tot_k = float(row["total_tokens"]) / 1000.0
-                        label = f"Session {short_cid} | {turns} turns | {tot_k:.1f}k tokens ({cached_k:.1f}k cached) | ${cost:.4f} | {st_time}"
+                        label = f"Session {short_cid} | {turns} turns | {tot_k:.1f}k tokens ({cached_k:.1f}k cached) | ${cost:.2f} | {st_time}"
                         conv_options[label] = cid
 
                     selected_label = st.selectbox(
@@ -1040,15 +1081,28 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 max_prompt_reached = int(df_turns["prompt_tokens"].max()) if not df_turns.empty else 0
                 context_saturation_pct = (max_prompt_reached / 1_048_576.0) * 100.0
 
+                # Formatted values for identical card sizing
+                spend_str = f"${tot_spend:,.2f}"
+                avg_turn_str = f"Avg ${tot_spend/max(1, tot_turns):.2f}/turn"
+                tokens_str = f"{tot_tokens/1_000_000.0:,.2f}M" if tot_tokens >= 1_000_000 else f"{tot_tokens/1000.0:,.1f}k"
+                cached_pill_text = f"{tot_cached/1_000_000.0:,.1f}M Cached" if tot_cached >= 1_000_000 else f"{tot_cached/1000.0:,.0f}k Cached"
+                cache_pill_class = "pill-green" if cache_hit_rate >= 50 else "pill-amber"
+                saved_str = f"+${dollars_saved:,.2f}"
+                max_ctx_str = f"{max_prompt_reached/1000.0:,.1f}k" if max_prompt_reached < 1_000_000 else f"{max_prompt_reached/1_000_000.0:,.2f}M"
+
                 # --- 5 MACRO KPI CARDS FOR SELECTED CONVERSATION ---
                 k1, k2, k3, k4, k5 = st.columns(5)
                 with k1:
                     st.html(
                         f"""
                         <div class="gcp-card">
-                            <div class="kpi-title">Session Spend</div>
-                            <div class="kpi-value" style="color: #1A73E8;">${tot_spend:,.4f}</div>
-                            <div class="pill pill-blue" style="margin-top: 8px;">Avg ${tot_spend/max(1, tot_turns):.4f}/turn</div>
+                            <div>
+                                <div class="kpi-title">Session Spend</div>
+                                <div class="kpi-value" style="color: #1A73E8;">{spend_str}</div>
+                            </div>
+                            <div style="margin-top: auto; padding-top: 6px;">
+                                <span class="pill pill-blue">{avg_turn_str}</span>
+                            </div>
                         </div>
                         """
                     )
@@ -1056,20 +1110,27 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                     st.html(
                         f"""
                         <div class="gcp-card">
-                            <div class="kpi-title">Total Tokens</div>
-                            <div class="kpi-value">{tot_tokens/1000.0:,.1f}<span style="font-size: 1.1rem; color: #5F6368; font-weight: 500;">k</span></div>
-                            <div class="pill pill-purple" style="margin-top: 8px;">{tot_turns} Execution Turns</div>
+                            <div>
+                                <div class="kpi-title">Total Tokens</div>
+                                <div class="kpi-value">{tokens_str}</div>
+                            </div>
+                            <div style="margin-top: auto; padding-top: 6px;">
+                                <span class="pill pill-purple">{tot_turns:,} Execution Turns</span>
+                            </div>
                         </div>
                         """
                     )
                 with k3:
-                    cache_pill_class = "pill-green" if cache_hit_rate >= 50 else "pill-amber"
                     st.html(
                         f"""
                         <div class="gcp-card">
-                            <div class="kpi-title">Cache Hit Rate</div>
-                            <div class="kpi-value" style="color: #137333;">{cache_hit_rate:.1f}%</div>
-                            <div class="pill {cache_pill_class}" style="margin-top: 8px;">{tot_cached/1000.0:,.1f}k Tokens Cached</div>
+                            <div>
+                                <div class="kpi-title">Cache Hit Rate</div>
+                                <div class="kpi-value" style="color: #137333;">{cache_hit_rate:.1f}%</div>
+                            </div>
+                            <div style="margin-top: auto; padding-top: 6px;">
+                                <span class="pill {cache_pill_class}">{cached_pill_text}</span>
+                            </div>
                         </div>
                         """
                     )
@@ -1077,9 +1138,13 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                     st.html(
                         f"""
                         <div class="gcp-card">
-                            <div class="kpi-title">Cost Saved (Cache)</div>
-                            <div class="kpi-value" style="color: #137333;">+${dollars_saved:,.4f}</div>
-                            <div class="pill pill-green" style="margin-top: 8px;">75% Cache Discount</div>
+                            <div>
+                                <div class="kpi-title">Cost Saved (Cache)</div>
+                                <div class="kpi-value" style="color: #137333;">{saved_str}</div>
+                            </div>
+                            <div style="margin-top: auto; padding-top: 6px;">
+                                <span class="pill pill-green">75% Cache Discount</span>
+                            </div>
                         </div>
                         """
                     )
@@ -1087,18 +1152,39 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                     st.html(
                         f"""
                         <div class="gcp-card">
-                            <div class="kpi-title">Max Context Reached</div>
-                            <div class="kpi-value">{max_prompt_reached/1000.0:,.1f}<span style="font-size: 1.1rem; color: #5F6368; font-weight: 500;">k</span></div>
-                            <div class="pill pill-blue" style="margin-top: 8px;">{context_saturation_pct:.1f}% of 1M Window</div>
+                            <div>
+                                <div class="kpi-title">Max Context Reached</div>
+                                <div class="kpi-value">{max_ctx_str}</div>
+                            </div>
+                            <div style="margin-top: auto; padding-top: 6px;">
+                                <span class="pill pill-blue">{context_saturation_pct:.1f}% of 1M Window</span>
+                            </div>
                         </div>
                         """
                     )
 
                 st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
 
-                # --- VISUALIZATIONS ROW 1: TURN-BY-TURN TOKEN PROGRESSION (STACKED BAR) ---
+                # --- VISUALIZATIONS ROW 1: TURN-BY-TURN TOKEN PROGRESSION (STACKED BAR - 20 TURNS WINDOW) ---
+                total_turns_count = len(df_turns)
+                window_size = 20
+
+                conv_chart_key = f"chart_turn_offset_{selected_conv_id}"
+                if conv_chart_key not in st.session_state:
+                    st.session_state[conv_chart_key] = max(0, total_turns_count - window_size)
+
+                # Clamp offset
+                curr_offset = st.session_state[conv_chart_key]
+                curr_offset = max(0, min(curr_offset, max(0, total_turns_count - window_size)))
+                st.session_state[conv_chart_key] = curr_offset
+
+                start_turn_idx = curr_offset
+                end_turn_idx = min(start_turn_idx + window_size, total_turns_count)
+                df_plot = df_turns.iloc[start_turn_idx:end_turn_idx].copy()
+                df_plot["step_label"] = "Turn " + df_plot["step_index"].astype(str)
+
                 st.html(
-                    """
+                    f"""
                     <div style="background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 8px; padding: 20px 22px 14px 22px; box-shadow: 0 1px 2px rgba(60,64,67,0.06); margin-bottom: 20px;">
                         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
                             <div>
@@ -1106,7 +1192,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                                     Turn-by-Turn Token Progression & Anatomy
                                 </span>
                                 <span style="font-size: 12px; color: #5F6368; margin-left: 8px;">
-                                    Exposes context growth (ratchet effect) and token composition across each execution step
+                                    Displaying 20 turns per window (Turns {start_turn_idx + 1}–{end_turn_idx} of {total_turns_count:,})
                                 </span>
                             </div>
                             <div style="display: flex; gap: 6px;">
@@ -1119,10 +1205,34 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                     """
                 )
 
-                if not df_turns.empty:
-                    df_plot = df_turns.copy()
-                    df_plot["step_label"] = "Turn " + df_plot["step_index"].astype(str)
+                # Navigation controls if more than 20 turns exist
+                if total_turns_count > window_size:
+                    c_btn1, c_btn2, c_info, c_btn3, c_btn4 = st.columns([1, 1, 2.5, 1, 1])
+                    with c_btn1:
+                        if st.button("⏮ First 20", disabled=(curr_offset <= 0), key=f"btn_first_{selected_conv_id}", use_container_width=True):
+                            st.session_state[conv_chart_key] = 0
+                            st.rerun()
+                    with c_btn2:
+                        if st.button("◀ Earlier 20", disabled=(curr_offset <= 0), key=f"btn_prev_{selected_conv_id}", use_container_width=True):
+                            st.session_state[conv_chart_key] = max(0, curr_offset - window_size)
+                            st.rerun()
+                    with c_info:
+                        st.markdown(
+                            f"<div style='text-align: center; padding-top: 6px; font-size: 13px; font-weight: 500; color: #202124;'>"
+                            f"Viewing Turns <strong>{start_turn_idx + 1} – {end_turn_idx}</strong> of <strong>{total_turns_count:,}</strong>"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
+                    with c_btn3:
+                        if st.button("Later 20 ▶", disabled=(end_turn_idx >= total_turns_count), key=f"btn_next_{selected_conv_id}", use_container_width=True):
+                            st.session_state[conv_chart_key] = min(total_turns_count - window_size, curr_offset + window_size)
+                            st.rerun()
+                    with c_btn4:
+                        if st.button("Latest 20 ⏭", disabled=(end_turn_idx >= total_turns_count), key=f"btn_latest_{selected_conv_id}", use_container_width=True):
+                            st.session_state[conv_chart_key] = max(0, total_turns_count - window_size)
+                            st.rerun()
 
+                if not df_plot.empty:
                     fig_prog = go.Figure()
 
                     # 1. Cached Prompt Tokens (Green)
@@ -1167,11 +1277,12 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         margin=dict(l=20, r=20, t=10, b=30),
                         paper_bgcolor="#FFFFFF",
                         plot_bgcolor="#FFFFFF",
+                        bargap=0.25,
                         font=dict(family="Roboto, sans-serif", size=12, color="#5F6368"),
                         xaxis=dict(
                             showgrid=False,
                             linecolor="#DADCE0",
-                            tickangle=-45 if len(df_plot) > 20 else 0,
+                            tickangle=0,
                         ),
                         yaxis=dict(
                             showgrid=True,
@@ -1224,7 +1335,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         paper_bgcolor="#FFFFFF",
                         showlegend=False,
                         annotations=[dict(
-                            text=f"<b>{tot_tokens/1000.0:,.1f}k</b><br><span style='font-size:11px;color:#5F6368;'>Total</span>",
+                            text=f"<b>{tokens_str}</b><br><span style='font-size:11px;color:#5F6368;'>Total</span>",
                             x=0.5, y=0.5, font_size=18, font_family="Google Sans", showarrow=False
                         )]
                     )
@@ -1259,7 +1370,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             name="Without Caching",
                             mode="lines",
                             line=dict(color="#80868B", width=2, dash="dash"),
-                            hovertemplate="<b>%{x}</b><br>Baseline: $%{y:.4f}<extra></extra>",
+                            hovertemplate="<b>%{x}</b><br>Baseline: $%{y:.2f}<extra></extra>",
                         ))
 
                         # Actual spend line (Google Blue)
@@ -1269,10 +1380,10 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             name="Actual Invoiced Spend",
                             mode="lines+markers",
                             line=dict(color="#1A73E8", width=3),
-                            marker=dict(size=5, color="#1A73E8"),
+                            marker=dict(size=4, color="#1A73E8"),
                             fill="tonexty",
                             fillcolor="rgba(52, 168, 83, 0.12)",
-                            hovertemplate="<b>%{x}</b><br>Actual Spend: $%{y:.4f}<extra></extra>",
+                            hovertemplate="<b>%{x}</b><br>Actual Spend: $%{y:.2f}<extra></extra>",
                         ))
 
                         fig_cost.update_layout(
@@ -1282,7 +1393,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             plot_bgcolor="#FFFFFF",
                             font=dict(family="Roboto, sans-serif", size=12, color="#5F6368"),
                             xaxis=dict(showgrid=False, linecolor="#DADCE0", tickangle=-45 if len(df_cost) > 20 else 0),
-                            yaxis=dict(showgrid=True, gridcolor="#F1F3F4", linecolor="#DADCE0", title="Cumulative USD ($)", tickprefix="$"),
+                            yaxis=dict(showgrid=True, gridcolor="#F1F3F4", linecolor="#DADCE0", title="Cumulative USD ($)", tickprefix="$", tickformat=".2f"),
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                         )
                         st.plotly_chart(fig_cost, use_container_width=True)
@@ -1290,9 +1401,16 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
 
                 st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
 
-                # --- TURN-BY-TURN GRANULAR TELEMETRY TABLE ---
+                # --- TURN-BY-TURN GRANULAR TELEMETRY TABLE (PAGINATED 100 TURNS) ---
+                table_limit_key = f"table_limit_{selected_conv_id}"
+                if table_limit_key not in st.session_state:
+                    st.session_state[table_limit_key] = 100
+
+                current_limit = st.session_state[table_limit_key]
+                df_table = df_turns.tail(current_limit).copy()
+
                 table_rows = []
-                for _, tr in df_turns.iterrows():
+                for _, tr in df_table.iterrows():
                     s_idx = int(tr["step_index"])
                     model_lbl = str(tr["model"])
                     tot_tok = int(tr["total_tokens"])
@@ -1318,7 +1436,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         <td style="font-family: 'Roboto Mono', monospace; color: #202124;">{out_t:,}</td>
                         <td style="font-size: 11px; color: #5F6368; font-family: 'Roboto Mono', monospace;">{lat_ms} ms</td>
                         <td style="font-size: 11px; color: #5F6368; font-family: 'Roboto Mono', monospace;">{speed}</td>
-                        <td style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace;">${step_c:,.6f}</td>
+                        <td style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace;">${step_c:,.2f}</td>
                     </tr>
                     """)
 
@@ -1333,33 +1451,60 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                                     Turn-by-Turn Granular Telemetry Trace
                                 </div>
                                 <div style="font-size: 12px; color: #5F6368;">
-                                    Detailed step-by-step audit of tokens, latency, cache absorption, and cost for Session {selected_conv_id[:8]}
+                                    Displaying last {len(df_table):,} of {total_turns_count:,} sequential execution turns for Session {selected_conv_id[:8]}
                                 </div>
                             </div>
-                            <span class="pill pill-blue">{len(df_turns)} Sequential Turns</span>
+                            <span class="pill pill-blue">Last {len(df_table):,} Turns</span>
                         </div>
-                        <table class="gcp-table">
-                            <thead>
-                                <tr>
-                                    <th>Turn / Step</th>
-                                    <th>Model</th>
-                                    <th>Total Tokens</th>
-                                    <th>New Prompt</th>
-                                    <th>Cached Prompt</th>
-                                    <th>Thinking Tokens</th>
-                                    <th>Output Tokens</th>
-                                    <th>Latency (TTFT)</th>
-                                    <th>Throughput</th>
-                                    <th>Step Cost ($ USD)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {joined_turns}
-                            </tbody>
-                        </table>
+                        <div class="gcp-scrollable-table">
+                            <table class="gcp-table">
+                                <thead>
+                                    <tr>
+                                        <th>Turn / Step</th>
+                                        <th>Model</th>
+                                        <th>Total Tokens</th>
+                                        <th>New Prompt</th>
+                                        <th>Cached Prompt</th>
+                                        <th>Thinking Tokens</th>
+                                        <th>Output Tokens</th>
+                                        <th>Latency (TTFT)</th>
+                                        <th>Throughput</th>
+                                        <th>Step Cost ($ USD)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {joined_turns}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     """
                 )
+
+                # Pagination controls for table
+                if total_turns_count > 100:
+                    c_p1, c_p2, c_p3 = st.columns([1.5, 1.5, 3])
+                    has_more = current_limit < total_turns_count
+                    with c_p1:
+                        if st.button("⬇ Load More (+100 Turns)", disabled=not has_more, key=f"btn_more_{selected_conv_id}", use_container_width=True):
+                            st.session_state[table_limit_key] = min(total_turns_count, current_limit + 100)
+                            st.rerun()
+                    with c_p2:
+                        if current_limit > 100:
+                            if st.button("↺ Reset to Last 100", key=f"btn_reset_{selected_conv_id}", use_container_width=True):
+                                st.session_state[table_limit_key] = 100
+                                st.rerun()
+                        elif has_more:
+                            if st.button(f"⬇ Load All ({total_turns_count:,} Turns)", key=f"btn_all_{selected_conv_id}", use_container_width=True):
+                                st.session_state[table_limit_key] = total_turns_count
+                                st.rerun()
+                    with c_p3:
+                        st.markdown(
+                            f"<div style='font-size: 12px; color: #5F6368; padding-top: 8px; text-align: right;'>"
+                            f"Showing <strong>{len(df_table):,}</strong> of <strong>{total_turns_count:,}</strong> sequential turns"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
 
     elif "Token Telemetry" in selected_nav:
         st.html(
