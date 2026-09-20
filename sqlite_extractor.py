@@ -270,6 +270,7 @@ def extract_conversation_steps(
         usage = _decode_protobuf_varint_map(meta_fields[9])
         prompt_tokens = int(usage.get(2, 0))
         output_tokens = int(usage.get(3, 0))
+        cached_tokens = int(usage.get(5, 0)) if 5 in usage else 0
         thinking_tokens = int(usage.get(9, 0)) if 9 in usage else None
         content_tokens = int(usage.get(10, 0)) if 10 in usage else None
 
@@ -293,6 +294,7 @@ def extract_conversation_steps(
             "model": model_name,
             "prompt_tokens": prompt_tokens,
             "output_tokens": output_tokens,
+            "cached_tokens": cached_tokens,
             "thinking_tokens": thinking_tokens,
             "content_tokens": content_tokens,
             "total_tokens": total_tokens,

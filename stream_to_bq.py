@@ -122,6 +122,7 @@ def build_bigquery_rows(
             "model": model_name,
             "prompt_tokens": prompt_tokens,
             "output_tokens": output_tokens,
+            "cached_tokens": r.get("cached_tokens", 0),
             "thinking_tokens": r.get("thinking_tokens"),
             "content_tokens": r.get("content_tokens"),
             "total_tokens": total_tokens,

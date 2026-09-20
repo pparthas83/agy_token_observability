@@ -460,6 +460,76 @@ def load_project_portfolio():
     return run_query(query)
 
 
+@st.cache_data(ttl=60)
+def load_deepdive_projects():
+    query = f"""
+    SELECT
+        antigravity_project_name,
+        COUNT(DISTINCT conversation_id) as conversations,
+        COUNT(*) as total_turns,
+        SUM(total_tokens) as total_tokens,
+        SUM(COALESCE(cached_tokens, 0)) as cached_tokens,
+        SUM(prompt_tokens) as prompt_tokens,
+        SUM(output_tokens) as output_tokens,
+        SUM(COALESCE(thinking_tokens, 0)) as thinking_tokens,
+        ROUND(SUM(estimated_cost_usd), 4) as cost_usd
+    FROM `{GCP_PROJECT}.{DATASET_ID}.antigravity_token_events`
+    WHERE antigravity_project_name IS NOT NULL
+    GROUP BY 1
+    ORDER BY cost_usd DESC
+    """
+    return run_query(query)
+
+
+@st.cache_data(ttl=60)
+def load_conversations_for_project(project_name: str):
+    query = f"""
+    SELECT
+        conversation_id,
+        MIN(timestamp) as start_time,
+        MAX(timestamp) as end_time,
+        COUNT(*) as turns,
+        SUM(total_tokens) as total_tokens,
+        SUM(COALESCE(cached_tokens, 0)) as cached_tokens,
+        SUM(prompt_tokens) as prompt_tokens,
+        SUM(output_tokens) as output_tokens,
+        SUM(COALESCE(thinking_tokens, 0)) as thinking_tokens,
+        ROUND(SUM(estimated_cost_usd), 4) as cost_usd,
+        ANY_VALUE(model) as primary_model
+    FROM `{GCP_PROJECT}.{DATASET_ID}.antigravity_token_events`
+    WHERE antigravity_project_name = '{project_name}'
+    GROUP BY conversation_id
+    ORDER BY start_time DESC
+    """
+    return run_query(query)
+
+
+@st.cache_data(ttl=60)
+def load_turns_for_conversation(conversation_id: str):
+    query = f"""
+    SELECT
+        step_index,
+        timestamp,
+        model,
+        prompt_tokens,
+        COALESCE(cached_tokens, 0) as cached_tokens,
+        GREATEST(0, prompt_tokens - COALESCE(cached_tokens, 0)) as uncached_prompt_tokens,
+        output_tokens,
+        COALESCE(thinking_tokens, 0) as thinking_tokens,
+        GREATEST(0, output_tokens - COALESCE(thinking_tokens, 0)) as content_tokens,
+        total_tokens,
+        latency_ms,
+        tokens_per_second,
+        ROUND(estimated_cost_usd, 6) as cost_usd,
+        tool_name,
+        step_type
+    FROM `{GCP_PROJECT}.{DATASET_ID}.antigravity_token_events`
+    WHERE conversation_id = '{conversation_id}'
+    ORDER BY step_index ASC
+    """
+    return run_query(query)
+
+
 # ==========================================
 # LEFT NAVIGATION PANEL
 # ==========================================
@@ -878,20 +948,418 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
         st.html(portfolio_table_html)
 
     elif "Tokenomics Deep Dive" in selected_nav:
-        st.html(
-            """
-            <div class="gcp-card" style="text-align: center; padding: 60px 24px; margin-top: 20px;">
-                <div style="font-size: 3.5rem; margin-bottom: 12px;">🔬</div>
-                <h2 style="font-size: 1.4rem; font-weight: 600; color: #202124; font-family: 'Google Sans'; margin-bottom: 8px;">
-                    Step 2: Tokenomics Deep Dive
-                </h2>
-                <p style="font-size: 0.9rem; color: #5F6368; max-width: 500px; margin: 0 auto; line-height: 1.5;">
-                    We are building one page at a time. The <strong>Executive Overview</strong> is now complete and sleek! 
-                    Next, we will implement this deep dive with per-project and per-conversation drilldowns and context bloat analysis.
-                </p>
-            </div>
-            """
-        )
+        # Load available projects for drilldown
+        df_deep_projects = load_deepdive_projects()
+
+        if df_deep_projects.empty:
+            st.warning("No project telemetry found in BigQuery.")
+        else:
+            project_names = df_deep_projects["antigravity_project_name"].tolist()
+            default_proj_idx = project_names.index("token_observability") if "token_observability" in project_names else 0
+
+            # --- DRILLDOWN FILTER BAR (GCP Styled) ---
+            st.html(
+                """
+                <div style="background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(60,64,67,0.06);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-size: 15px; font-weight: 700; color: #202124; font-family: 'Google Sans', sans-serif;">
+                                Granular Tokenomics & Context Drilldown
+                            </div>
+                            <div style="font-size: 12px; color: #5F6368; font-family: 'Roboto', sans-serif; margin-top: 2px;">
+                                Inspect token anatomy (Prompt, Thinking, Output) and cache absorption across projects, sessions, and individual execution turns.
+                            </div>
+                        </div>
+                        <span class="pill pill-blue">Multi-Level Drilldown</span>
+                    </div>
+                </div>
+                """
+            )
+
+            # Two selectboxes for Project and Conversation
+            col_proj, col_conv = st.columns([1, 2])
+
+            with col_proj:
+                selected_project = st.selectbox(
+                    "📁 Select Project / Repository",
+                    project_names,
+                    index=default_proj_idx,
+                )
+
+            df_convs = load_conversations_for_project(selected_project)
+
+            with col_conv:
+                if df_convs.empty:
+                    st.info(f"No sessions found for project {selected_project}.")
+                    selected_conv_id = None
+                else:
+                    conv_options = {}
+                    for _, row in df_convs.iterrows():
+                        cid = row["conversation_id"]
+                        short_cid = f"{cid[:8]}...{cid[-4:]}"
+                        turns = int(row["turns"])
+                        cost = float(row["cost_usd"])
+                        st_time = pd.to_datetime(row["start_time"]).strftime("%b %d, %H:%M")
+                        cached_k = float(row["cached_tokens"]) / 1000.0
+                        tot_k = float(row["total_tokens"]) / 1000.0
+                        label = f"Session {short_cid} | {turns} turns | {tot_k:.1f}k tokens ({cached_k:.1f}k cached) | ${cost:.4f} | {st_time}"
+                        conv_options[label] = cid
+
+                    selected_label = st.selectbox(
+                        "💬 Select Conversation / Session",
+                        list(conv_options.keys()),
+                        index=0,
+                    )
+                    selected_conv_id = conv_options[selected_label]
+
+            if selected_conv_id:
+                # Fetch granular turn-by-turn data
+                df_turns = load_turns_for_conversation(selected_conv_id)
+
+                # Fetch row summary from df_convs
+                conv_row = df_convs[df_convs["conversation_id"] == selected_conv_id].iloc[0]
+
+                tot_spend = float(conv_row["cost_usd"])
+                tot_tokens = int(conv_row["total_tokens"])
+                tot_prompt = int(conv_row["prompt_tokens"])
+                tot_cached = int(conv_row["cached_tokens"])
+                tot_uncached = max(0, tot_prompt - tot_cached)
+                tot_output = int(conv_row["output_tokens"])
+                tot_thinking = int(conv_row["thinking_tokens"])
+                tot_content = max(0, tot_output - tot_thinking)
+                tot_turns = int(conv_row["turns"])
+
+                # Cache efficiency: % of prompt tokens that came from cache
+                cache_hit_rate = (tot_cached / tot_prompt * 100.0) if tot_prompt > 0 else 0.0
+                cache_hit_rate = min(100.0, max(0.0, cache_hit_rate))
+
+                # Gemini prompt cache discount: $0.15/M -> $0.0375/M (savings = $0.1125/M)
+                dollars_saved = (tot_cached / 1_000_000.0) * 0.1125
+
+                # Peak context window reached (max prompt in any turn)
+                max_prompt_reached = int(df_turns["prompt_tokens"].max()) if not df_turns.empty else 0
+                context_saturation_pct = (max_prompt_reached / 1_048_576.0) * 100.0
+
+                # --- 5 MACRO KPI CARDS FOR SELECTED CONVERSATION ---
+                k1, k2, k3, k4, k5 = st.columns(5)
+                with k1:
+                    st.html(
+                        f"""
+                        <div class="gcp-card">
+                            <div class="kpi-title">Session Spend</div>
+                            <div class="kpi-value" style="color: #1A73E8;">${tot_spend:,.4f}</div>
+                            <div class="pill pill-blue" style="margin-top: 8px;">Avg ${tot_spend/max(1, tot_turns):.4f}/turn</div>
+                        </div>
+                        """
+                    )
+                with k2:
+                    st.html(
+                        f"""
+                        <div class="gcp-card">
+                            <div class="kpi-title">Total Tokens</div>
+                            <div class="kpi-value">{tot_tokens/1000.0:,.1f}<span style="font-size: 1.1rem; color: #5F6368; font-weight: 500;">k</span></div>
+                            <div class="pill pill-purple" style="margin-top: 8px;">{tot_turns} Execution Turns</div>
+                        </div>
+                        """
+                    )
+                with k3:
+                    cache_pill_class = "pill-green" if cache_hit_rate >= 50 else "pill-amber"
+                    st.html(
+                        f"""
+                        <div class="gcp-card">
+                            <div class="kpi-title">Cache Hit Rate</div>
+                            <div class="kpi-value" style="color: #137333;">{cache_hit_rate:.1f}%</div>
+                            <div class="pill {cache_pill_class}" style="margin-top: 8px;">{tot_cached/1000.0:,.1f}k Tokens Cached</div>
+                        </div>
+                        """
+                    )
+                with k4:
+                    st.html(
+                        f"""
+                        <div class="gcp-card">
+                            <div class="kpi-title">Cost Saved (Cache)</div>
+                            <div class="kpi-value" style="color: #137333;">+${dollars_saved:,.4f}</div>
+                            <div class="pill pill-green" style="margin-top: 8px;">75% Cache Discount</div>
+                        </div>
+                        """
+                    )
+                with k5:
+                    st.html(
+                        f"""
+                        <div class="gcp-card">
+                            <div class="kpi-title">Max Context Reached</div>
+                            <div class="kpi-value">{max_prompt_reached/1000.0:,.1f}<span style="font-size: 1.1rem; color: #5F6368; font-weight: 500;">k</span></div>
+                            <div class="pill pill-blue" style="margin-top: 8px;">{context_saturation_pct:.1f}% of 1M Window</div>
+                        </div>
+                        """
+                    )
+
+                st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+
+                # --- VISUALIZATIONS ROW 1: TURN-BY-TURN TOKEN PROGRESSION (STACKED BAR) ---
+                st.html(
+                    """
+                    <div style="background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 8px; padding: 20px 22px 14px 22px; box-shadow: 0 1px 2px rgba(60,64,67,0.06); margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+                            <div>
+                                <span style="font-family: 'Google Sans', sans-serif; font-size: 15px; font-weight: 600; color: #202124;">
+                                    Turn-by-Turn Token Progression & Anatomy
+                                </span>
+                                <span style="font-size: 12px; color: #5F6368; margin-left: 8px;">
+                                    Exposes context growth (ratchet effect) and token composition across each execution step
+                                </span>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <span class="pill pill-green">Cached Context</span>
+                                <span class="pill pill-blue">New Prompt</span>
+                                <span class="pill pill-purple">Reasoning / Thinking</span>
+                                <span class="pill pill-amber">Output Content</span>
+                            </div>
+                        </div>
+                    """
+                )
+
+                if not df_turns.empty:
+                    df_plot = df_turns.copy()
+                    df_plot["step_label"] = "Turn " + df_plot["step_index"].astype(str)
+
+                    fig_prog = go.Figure()
+
+                    # 1. Cached Prompt Tokens (Green)
+                    fig_prog.add_trace(go.Bar(
+                        x=df_plot["step_label"],
+                        y=df_plot["cached_tokens"],
+                        name="Cached Prompt",
+                        marker_color="#34A853",
+                        hovertemplate="<b>%{x}</b><br>Cached Context: %{y:,} tokens<extra></extra>",
+                    ))
+
+                    # 2. Uncached Prompt Tokens (Blue)
+                    fig_prog.add_trace(go.Bar(
+                        x=df_plot["step_label"],
+                        y=df_plot["uncached_prompt_tokens"],
+                        name="New Prompt",
+                        marker_color="#1A73E8",
+                        hovertemplate="<b>%{x}</b><br>New Prompt Context: %{y:,} tokens<extra></extra>",
+                    ))
+
+                    # 3. Thinking / Reasoning Tokens (Purple)
+                    fig_prog.add_trace(go.Bar(
+                        x=df_plot["step_label"],
+                        y=df_plot["thinking_tokens"],
+                        name="Thinking (Reasoning)",
+                        marker_color="#9334E6",
+                        hovertemplate="<b>%{x}</b><br>Thinking Tokens: %{y:,} tokens<extra></extra>",
+                    ))
+
+                    # 4. Output Content Tokens (Amber/Coral)
+                    fig_prog.add_trace(go.Bar(
+                        x=df_plot["step_label"],
+                        y=df_plot["content_tokens"],
+                        name="Output Content",
+                        marker_color="#F2994A",
+                        hovertemplate="<b>%{x}</b><br>Output Content: %{y:,} tokens<extra></extra>",
+                    ))
+
+                    fig_prog.update_layout(
+                        barmode="stack",
+                        height=360,
+                        margin=dict(l=20, r=20, t=10, b=30),
+                        paper_bgcolor="#FFFFFF",
+                        plot_bgcolor="#FFFFFF",
+                        font=dict(family="Roboto, sans-serif", size=12, color="#5F6368"),
+                        xaxis=dict(
+                            showgrid=False,
+                            linecolor="#DADCE0",
+                            tickangle=-45 if len(df_plot) > 20 else 0,
+                        ),
+                        yaxis=dict(
+                            showgrid=True,
+                            gridcolor="#F1F3F4",
+                            linecolor="#DADCE0",
+                            title="Tokens Consumed",
+                        ),
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=1.02,
+                            xanchor="right",
+                            x=1,
+                        ),
+                    )
+                    st.plotly_chart(fig_prog, use_container_width=True)
+                st.html("</div>")
+
+                # --- VISUALIZATIONS ROW 2: DONUT SPLIT & CUMULATIVE COST TRAJECTORY ---
+                c_left, c_right = st.columns([1, 1])
+
+                with c_left:
+                    st.html(
+                        """
+                        <div style="background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 8px; padding: 20px 22px 14px 22px; box-shadow: 0 1px 2px rgba(60,64,67,0.06);">
+                            <div style="font-family: 'Google Sans', sans-serif; font-size: 15px; font-weight: 600; color: #202124; margin-bottom: 4px;">
+                                Aggregate Token Composition
+                            </div>
+                            <div style="font-size: 12px; color: #5F6368; margin-bottom: 12px;">
+                                Breakdown of cached context, new input, reasoning, and visible output
+                            </div>
+                        """
+                    )
+                    labels = ["Cached Prompt", "New Prompt", "Thinking (Reasoning)", "Output Content"]
+                    values = [tot_cached, tot_uncached, tot_thinking, tot_content]
+                    colors = ["#34A853", "#1A73E8", "#9334E6", "#F2994A"]
+
+                    fig_pie = go.Figure(data=[go.Pie(
+                        labels=labels,
+                        values=values,
+                        hole=0.58,
+                        marker=dict(colors=colors),
+                        textinfo="percent+label",
+                        insidetextorientation="radial",
+                        hovertemplate="<b>%{label}</b><br>Tokens: %{value:,}<br>Share: %{percent}<extra></extra>",
+                    )])
+                    fig_pie.update_layout(
+                        height=300,
+                        margin=dict(l=10, r=10, t=10, b=10),
+                        paper_bgcolor="#FFFFFF",
+                        showlegend=False,
+                        annotations=[dict(
+                            text=f"<b>{tot_tokens/1000.0:,.1f}k</b><br><span style='font-size:11px;color:#5F6368;'>Total</span>",
+                            x=0.5, y=0.5, font_size=18, font_family="Google Sans", showarrow=False
+                        )]
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
+                    st.html("</div>")
+
+                with c_right:
+                    st.html(
+                        """
+                        <div style="background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 8px; padding: 20px 22px 14px 22px; box-shadow: 0 1px 2px rgba(60,64,67,0.06);">
+                            <div style="font-family: 'Google Sans', sans-serif; font-size: 15px; font-weight: 600; color: #202124; margin-bottom: 4px;">
+                                Financial Cost Trajectory & Cache Savings
+                            </div>
+                            <div style="font-size: 12px; color: #5F6368; margin-bottom: 12px;">
+                                Cumulative spend vs. hypothetical baseline without prompt caching ($ USD)
+                            </div>
+                        """
+                    )
+                    if not df_turns.empty:
+                        df_cost = df_turns.copy()
+                        df_cost["cum_actual_cost"] = df_cost["cost_usd"].cumsum()
+                        df_cost["turn_saved"] = (df_cost["cached_tokens"] / 1_000_000.0) * 0.1125
+                        df_cost["cum_baseline_cost"] = df_cost["cum_actual_cost"] + df_cost["turn_saved"].cumsum()
+                        df_cost["step_label"] = "Turn " + df_cost["step_index"].astype(str)
+
+                        fig_cost = go.Figure()
+
+                        # Baseline line (Grey dashed)
+                        fig_cost.add_trace(go.Scatter(
+                            x=df_cost["step_label"],
+                            y=df_cost["cum_baseline_cost"],
+                            name="Without Caching",
+                            mode="lines",
+                            line=dict(color="#80868B", width=2, dash="dash"),
+                            hovertemplate="<b>%{x}</b><br>Baseline: $%{y:.4f}<extra></extra>",
+                        ))
+
+                        # Actual spend line (Google Blue)
+                        fig_cost.add_trace(go.Scatter(
+                            x=df_cost["step_label"],
+                            y=df_cost["cum_actual_cost"],
+                            name="Actual Invoiced Spend",
+                            mode="lines+markers",
+                            line=dict(color="#1A73E8", width=3),
+                            marker=dict(size=5, color="#1A73E8"),
+                            fill="tonexty",
+                            fillcolor="rgba(52, 168, 83, 0.12)",
+                            hovertemplate="<b>%{x}</b><br>Actual Spend: $%{y:.4f}<extra></extra>",
+                        ))
+
+                        fig_cost.update_layout(
+                            height=300,
+                            margin=dict(l=20, r=20, t=10, b=30),
+                            paper_bgcolor="#FFFFFF",
+                            plot_bgcolor="#FFFFFF",
+                            font=dict(family="Roboto, sans-serif", size=12, color="#5F6368"),
+                            xaxis=dict(showgrid=False, linecolor="#DADCE0", tickangle=-45 if len(df_cost) > 20 else 0),
+                            yaxis=dict(showgrid=True, gridcolor="#F1F3F4", linecolor="#DADCE0", title="Cumulative USD ($)", tickprefix="$"),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        )
+                        st.plotly_chart(fig_cost, use_container_width=True)
+                    st.html("</div>")
+
+                st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+
+                # --- TURN-BY-TURN GRANULAR TELEMETRY TABLE ---
+                table_rows = []
+                for _, tr in df_turns.iterrows():
+                    s_idx = int(tr["step_index"])
+                    model_lbl = str(tr["model"])
+                    tot_tok = int(tr["total_tokens"])
+                    uncached_p = int(tr["uncached_prompt_tokens"])
+                    cached_t = int(tr["cached_tokens"])
+                    thk_t = int(tr["thinking_tokens"])
+                    out_t = int(tr["content_tokens"])
+                    lat_ms = int(tr["latency_ms"]) if pd.notnull(tr["latency_ms"]) else "-"
+                    speed = f"{float(tr['tokens_per_second']):.1f} tok/s" if pd.notnull(tr["tokens_per_second"]) and tr["tokens_per_second"] > 0 else "-"
+                    step_c = float(tr["cost_usd"])
+
+                    cached_badge = f'<span class="pill pill-green">{cached_t:,}</span>' if cached_t > 0 else '<span style="color:#BDC1C6;">0</span>'
+                    thinking_badge = f'<span class="pill pill-purple">{thk_t:,}</span>' if thk_t > 0 else '<span style="color:#BDC1C6;">0</span>'
+
+                    table_rows.append(f"""
+                    <tr>
+                        <td style="font-weight: 600; color: #1A73E8; font-family: 'Roboto Mono', monospace;">Turn #{s_idx}</td>
+                        <td style="font-size: 11px; color: #5F6368; font-family: 'Roboto Mono', monospace;">{model_lbl}</td>
+                        <td style="font-weight: 600; font-family: 'Roboto Mono', monospace;">{tot_tok:,}</td>
+                        <td style="font-family: 'Roboto Mono', monospace; color: #202124;">{uncached_p:,}</td>
+                        <td>{cached_badge}</td>
+                        <td>{thinking_badge}</td>
+                        <td style="font-family: 'Roboto Mono', monospace; color: #202124;">{out_t:,}</td>
+                        <td style="font-size: 11px; color: #5F6368; font-family: 'Roboto Mono', monospace;">{lat_ms} ms</td>
+                        <td style="font-size: 11px; color: #5F6368; font-family: 'Roboto Mono', monospace;">{speed}</td>
+                        <td style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace;">${step_c:,.6f}</td>
+                    </tr>
+                    """)
+
+                joined_turns = "\n".join(table_rows)
+
+                st.html(
+                    f"""
+                    <div class="gcp-table-container">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                            <div>
+                                <div style="font-family: 'Google Sans', sans-serif; font-size: 15px; font-weight: 600; color: #202124;">
+                                    Turn-by-Turn Granular Telemetry Trace
+                                </div>
+                                <div style="font-size: 12px; color: #5F6368;">
+                                    Detailed step-by-step audit of tokens, latency, cache absorption, and cost for Session {selected_conv_id[:8]}
+                                </div>
+                            </div>
+                            <span class="pill pill-blue">{len(df_turns)} Sequential Turns</span>
+                        </div>
+                        <table class="gcp-table">
+                            <thead>
+                                <tr>
+                                    <th>Turn / Step</th>
+                                    <th>Model</th>
+                                    <th>Total Tokens</th>
+                                    <th>New Prompt</th>
+                                    <th>Cached Prompt</th>
+                                    <th>Thinking Tokens</th>
+                                    <th>Output Tokens</th>
+                                    <th>Latency (TTFT)</th>
+                                    <th>Throughput</th>
+                                    <th>Step Cost ($ USD)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {joined_turns}
+                            </tbody>
+                        </table>
+                    </div>
+                    """
+                )
 
     elif "Token Telemetry" in selected_nav:
         st.html(
