@@ -56,17 +56,58 @@ def test_telemetry_phase_breakdown():
     assert total_turn_ms == 13800
 
 
+def compute_directional_context(prompt_tokens: int, cached_tokens: int):
+    c_tok = max(0, cached_tokens)
+    # If prompt_tokens >= cached_tokens, prompt_tokens is total prompt
+    if prompt_tokens >= c_tok:
+        fresh_tok = prompt_tokens - c_tok
+    else:
+        # prompt_tokens is uncached fresh tokens
+        fresh_tok = prompt_tokens
+    tot_prompt = c_tok + fresh_tok
+    if tot_prompt > 0:
+        cache_pct = round((c_tok / tot_prompt) * 100.0, 1)
+        fresh_pct = round(100.0 - cache_pct, 1)
+    else:
+        cache_pct = 0.0
+        fresh_pct = 100.0
+    return tot_prompt, c_tok, fresh_tok, cache_pct, fresh_pct
+
+
 def test_directional_context_percentages():
-    total_prompt = 100000
-    cached = 75000
-    uncached = total_prompt - cached
+    # Case 1: Standard case where prompt_tokens contains total prompt
+    tot, c, f, c_pct, f_pct = compute_directional_context(prompt_tokens=100_000, cached_tokens=75_000)
+    assert tot == 100_000
+    assert c == 75_000
+    assert f == 25_000
+    assert c_pct == 75.0
+    assert f_pct == 25.0
+    assert (c_pct + f_pct) == 100.0
 
-    cached_pct = round((cached / total_prompt) * 100, 1)
-    uncached_pct = round((uncached / total_prompt) * 100, 1)
+    # Case 2: Turn #6674 from user screenshot (prompt_tokens recorded uncached portion)
+    tot, c, f, c_pct, f_pct = compute_directional_context(prompt_tokens=2_930, cached_tokens=74_448)
+    assert tot == 77_378
+    assert c == 74_448
+    assert f == 2_930
+    assert c_pct == 96.2
+    assert f_pct == 3.8
+    assert (c_pct + f_pct) == 100.0
+    assert 0.0 <= c_pct <= 100.0
+    assert 0.0 <= f_pct <= 100.0
 
-    assert cached_pct == 75.0
-    assert uncached_pct == 25.0
-    assert (cached_pct + uncached_pct) == 100.0
+    # Case 3: Initial cold prefill turn (no cache)
+    tot, c, f, c_pct, f_pct = compute_directional_context(prompt_tokens=15_000, cached_tokens=0)
+    assert tot == 15_000
+    assert c == 0
+    assert f == 15_000
+    assert c_pct == 0.0
+    assert f_pct == 100.0
+
+    # Case 4: Zero tokens safeguard
+    tot, c, f, c_pct, f_pct = compute_directional_context(prompt_tokens=0, cached_tokens=0)
+    assert tot == 0
+    assert c_pct == 0.0
+    assert f_pct == 100.0
 
 
 def test_extract_turn_context_nonexistent_conv():

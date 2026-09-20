@@ -1834,7 +1834,8 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
             unsafe_allow_html=True,
         )
 
-        # Prepare latency segments
+        # Prepare latency segments & accurate prompt context totals
+        df_window["total_prompt_tokens"] = df_window["cached_tokens"] + df_window["uncached_prompt_tokens"]
         df_window["client_prep_s"] = (df_window["client_prep_ms"] / 1000.0).clip(lower=0.0)
         df_window["ttft_s"] = (df_window["ttft_latency_ms"] / 1000.0).clip(lower=0.0)
 
@@ -1875,7 +1876,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 name="TTFT (Prefill)",
                 orientation="h",
                 marker=dict(color="#FBBC04"),
-                customdata=df_window[["ttft_latency_ms", "prompt_tokens", "cached_tokens"]],
+                customdata=df_window[["ttft_latency_ms", "total_prompt_tokens", "cached_tokens"]],
                 hovertemplate="<b>%{y}</b><br>TTFT: %{customdata[0]:,} ms<br>Prompt: %{customdata[1]:,} tok (%{customdata[2]:,} cached)<extra></extra>",
             )
         )
@@ -1970,11 +1971,15 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
         ttft_ms = int(turn_row["ttft_latency_ms"])
         gen_ms = int(turn_row["generation_duration_ms"])
         tot_s = float(turn_row["total_latency_s"])
-        p_tok = int(turn_row["prompt_tokens"])
         c_tok = int(turn_row["cached_tokens"])
-        fresh_tok = max(0, p_tok - c_tok)
-        cache_pct = round((c_tok / p_tok * 100), 1) if p_tok > 0 else 0.0
-        fresh_pct = round(100.0 - cache_pct, 1)
+        fresh_tok = int(turn_row["uncached_prompt_tokens"])
+        tot_turn_prompt = c_tok + fresh_tok
+        if tot_turn_prompt > 0:
+            cache_pct = round((c_tok / tot_turn_prompt) * 100.0, 1)
+            fresh_pct = round(100.0 - cache_pct, 1)
+        else:
+            cache_pct = 0.0
+            fresh_pct = 100.0
         thk_tok = int(turn_row["thinking_tokens"])
         cnt_tok = int(turn_row["content_tokens"])
         speed = (
@@ -2013,7 +2018,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         <div class="kpi-icon-container" style="background: #E6F4EA; color: #137333;">💾</div>
                     </div>
                     <div>
-                        <div style="font-size: 1.45rem; font-weight: 700; color: #202124; font-family: 'Google Sans', sans-serif;">{fmt_tok(p_tok)}</div>
+                        <div style="font-size: 1.45rem; font-weight: 700; color: #202124; font-family: 'Google Sans', sans-serif;">{fmt_tok(tot_turn_prompt)}</div>
                         <div style="font-size: 11px; color: #5F6368; margin-top: 2px;">{cache_pct}% Cached | {fresh_pct}% Fresh</div>
                     </div>
                 </div>
@@ -2071,7 +2076,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             🗺️ Directional Context Footprint: Turn #{selected_step}
                         </span>
                         <span style="font-size: 12px; color: #5F6368; margin-left: 8px;">
-                            (Total Prompt: {p_tok:,} tokens)
+                            (Total Prompt: {tot_turn_prompt:,} tokens)
                         </span>
                     </div>
                     <div>{cache_status_badge}</div>
@@ -2102,7 +2107,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 cm = context_extractor.extract_turn_context_metadata(
                     conversation_id=selected_conv_id,
                     step_index=int(selected_step),
-                    prompt_tokens=p_tok,
+                    prompt_tokens=tot_turn_prompt,
                     cached_tokens=c_tok,
                 )
             except Exception:
@@ -2112,7 +2117,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
             if context_extractor:
                 cm = context_extractor.generate_fallback_context(
                     step_index=int(selected_step),
-                    prompt_tokens=p_tok,
+                    prompt_tokens=tot_turn_prompt,
                     cached_tokens=c_tok,
                     tool_name=str(turn_row.get("tool_name", "")),
                 )
@@ -2320,88 +2325,6 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 </div>
                 """
             )
-
-        # 11. TTFT vs. Prompt Size Correlation Scatter Plot (Analytical Insight)
-        st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
-        st.markdown(
-            """
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                <div>
-                    <span style="font-size: 15px; font-weight: 700; color: #202124; font-family: 'Google Sans';">
-                        📈 TTFT Latency vs. Prompt Size Correlation
-                    </span>
-                    <span style="font-size: 12px; color: #5F6368; margin-left: 8px;">
-                        (Verifies how prompt caching prevents TTFT latency explosion as session history grows)
-                    </span>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        df_scatter = df_telem.copy()
-        df_scatter["prompt_k"] = df_scatter["prompt_tokens"] / 1000.0
-        df_scatter["ttft_s"] = df_scatter["ttft_latency_ms"] / 1000.0
-        df_scatter["cache_hit_rate"] = (
-            (df_scatter["cached_tokens"] / df_scatter["prompt_tokens"]).clip(0.0, 1.0) * 100
-        ).round(1)
-        df_scatter["cache_status"] = df_scatter["cache_hit_rate"].apply(
-            lambda x: "Cache Hit (>=70%)" if x >= 70 else "Cache Miss / Cold (<70%)"
-        )
-
-        fig_corr = px.scatter(
-            df_scatter,
-            x="prompt_k",
-            y="ttft_s",
-            color="cache_status",
-            color_discrete_map={
-                "Cache Hit (>=70%)": "#34A853",
-                "Cache Miss / Cold (<70%)": "#EA4335",
-            },
-            hover_data={
-                "step_index": True,
-                "prompt_tokens": True,
-                "cached_tokens": True,
-                "ttft_latency_ms": True,
-                "tokens_per_second": True,
-                "prompt_k": False,
-                "ttft_s": False,
-                "cache_status": False,
-            },
-            labels={
-                "prompt_k": "Total Prompt Tokens (k)",
-                "ttft_s": "Time to First Token (Seconds)",
-                "cache_status": "Cache Status",
-            },
-        )
-
-        fig_corr.update_traces(marker=dict(size=9, opacity=0.85, line=dict(width=1, color="#FFFFFF")))
-
-        fig_corr.update_layout(
-            height=320,
-            margin=dict(l=10, r=20, t=20, b=20),
-            paper_bgcolor="#FFFFFF",
-            plot_bgcolor="#FFFFFF",
-            font=dict(family="'Google Sans', 'Roboto', sans-serif", size=12, color="#202124"),
-            xaxis=dict(
-                title=dict(text="Total Prompt Size (Thousands of Tokens)", font=dict(size=12, color="#5F6368")),
-                gridcolor="#F1F3F4",
-            ),
-            yaxis=dict(
-                title=dict(text="TTFT Latency (Seconds)", font=dict(size=12, color="#5F6368")),
-                gridcolor="#F1F3F4",
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="left",
-                x=0,
-                font=dict(size=11, color="#3C4043"),
-            ),
-        )
-
-        st.plotly_chart(fig_corr, use_container_width=True)
 
 except Exception as e:
     st.error(f"Error loading Token Observability dashboard: {e}")
