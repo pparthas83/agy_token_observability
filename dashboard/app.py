@@ -1203,7 +1203,8 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 start_turn_idx = curr_offset
                 end_turn_idx = min(start_turn_idx + window_size, total_turns_count)
                 df_plot = df_turns.iloc[start_turn_idx:end_turn_idx].copy()
-                df_plot["step_label"] = "Turn " + df_plot["step_index"].astype(str)
+                df_plot["step_label"] = "Turn<br>#" + df_plot["step_index"].astype(str)
+                df_plot["step_str"] = df_plot["step_index"].astype(str)
 
                 st.html(
                     f"""
@@ -1262,8 +1263,9 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         x=df_plot["step_label"],
                         y=df_plot["cached_tokens"],
                         name="Cached Prompt",
+                        customdata=df_plot["step_str"],
                         marker_color="#34A853",
-                        hovertemplate="<b>%{x}</b><br>Cached Context: %{y:,} tokens<extra></extra>",
+                        hovertemplate="<b>Turn #%{customdata}</b><br>Cached Context: %{y:,} tokens<extra></extra>",
                     ))
 
                     # 2. Uncached Prompt Tokens (Blue)
@@ -1271,8 +1273,9 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         x=df_plot["step_label"],
                         y=df_plot["uncached_prompt_tokens"],
                         name="New Prompt",
+                        customdata=df_plot["step_str"],
                         marker_color="#1A73E8",
-                        hovertemplate="<b>%{x}</b><br>New Prompt Context: %{y:,} tokens<extra></extra>",
+                        hovertemplate="<b>Turn #%{customdata}</b><br>New Prompt Context: %{y:,} tokens<extra></extra>",
                     ))
 
                     # 3. Thinking / Reasoning Tokens (Purple)
@@ -1280,8 +1283,9 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         x=df_plot["step_label"],
                         y=df_plot["thinking_tokens"],
                         name="Thinking (Reasoning)",
+                        customdata=df_plot["step_str"],
                         marker_color="#9334E6",
-                        hovertemplate="<b>%{x}</b><br>Thinking Tokens: %{y:,} tokens<extra></extra>",
+                        hovertemplate="<b>Turn #%{customdata}</b><br>Thinking Tokens: %{y:,} tokens<extra></extra>",
                     ))
 
                     # 4. Output Content Tokens (Amber/Coral)
@@ -1289,14 +1293,15 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         x=df_plot["step_label"],
                         y=df_plot["content_tokens"],
                         name="Output Content",
+                        customdata=df_plot["step_str"],
                         marker_color="#F2994A",
-                        hovertemplate="<b>%{x}</b><br>Output Content: %{y:,} tokens<extra></extra>",
+                        hovertemplate="<b>Turn #%{customdata}</b><br>Output Content: %{y:,} tokens<extra></extra>",
                     ))
 
                     fig_prog.update_layout(
                         barmode="stack",
                         height=360,
-                        margin=dict(l=20, r=20, t=10, b=30),
+                        margin=dict(l=20, r=20, t=10, b=50),
                         paper_bgcolor="#FFFFFF",
                         plot_bgcolor="#FFFFFF",
                         bargap=0.25,
@@ -1305,6 +1310,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             showgrid=False,
                             linecolor="#DADCE0",
                             tickangle=0,
+                            tickfont=dict(family="Roboto Mono, monospace", size=11, color="#3C4043"),
                         ),
                         yaxis=dict(
                             showgrid=True,
@@ -1338,27 +1344,56 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             </div>
                         """
                     )
-                    labels = ["Cached Prompt", "New Prompt", "Thinking (Reasoning)", "Output Content"]
+                    def _fmt_tok_short(n):
+                        if n >= 1_000_000:
+                            return f"{n/1_000_000.0:.2f}M"
+                        elif n >= 1_000:
+                            return f"{n/1000.0:.1f}k"
+                        return f"{int(n):,}"
+
+                    tot_all_pie = max(1, tot_tokens)
+                    pct_cached = (tot_cached / tot_all_pie) * 100
+                    pct_uncached = (tot_uncached / tot_all_pie) * 100
+                    pct_thinking = (tot_thinking / tot_all_pie) * 100
+                    pct_content = (tot_content / tot_all_pie) * 100
+
+                    labels = [
+                        f"Cached Prompt: {_fmt_tok_short(tot_cached)} ({pct_cached:.1f}%)",
+                        f"New Prompt: {_fmt_tok_short(tot_uncached)} ({pct_uncached:.1f}%)",
+                        f"Thinking: {_fmt_tok_short(tot_thinking)} ({pct_thinking:.1f}%)",
+                        f"Output Content: {_fmt_tok_short(tot_content)} ({pct_content:.1f}%)",
+                    ]
                     values = [tot_cached, tot_uncached, tot_thinking, tot_content]
                     colors = ["#34A853", "#1A73E8", "#9334E6", "#F2994A"]
 
                     fig_pie = go.Figure(data=[go.Pie(
                         labels=labels,
                         values=values,
-                        hole=0.58,
-                        marker=dict(colors=colors),
-                        textinfo="percent+label",
-                        insidetextorientation="radial",
+                        domain=dict(x=[0.0, 0.46], y=[0.0, 1.0]),
+                        hole=0.62,
+                        marker=dict(colors=colors, line=dict(color="#FFFFFF", width=2)),
+                        textinfo="none",
+                        hoverinfo="label+value+percent",
                         hovertemplate="<b>%{label}</b><br>Tokens: %{value:,}<br>Share: %{percent}<extra></extra>",
                     )])
                     fig_pie.update_layout(
-                        height=300,
+                        height=320,
                         margin=dict(l=10, r=10, t=10, b=10),
                         paper_bgcolor="#FFFFFF",
-                        showlegend=False,
+                        showlegend=True,
+                        legend=dict(
+                            orientation="v",
+                            x=0.48,
+                            y=0.5,
+                            yanchor="middle",
+                            xanchor="left",
+                            font=dict(size=12, family="Roboto, sans-serif", color="#202124"),
+                            itemclick=False,
+                            itemdoubleclick=False,
+                        ),
                         annotations=[dict(
                             text=f"<b>{tokens_str}</b><br><span style='font-size:11px;color:#5F6368;'>Total</span>",
-                            x=0.5, y=0.5, font_size=18, font_family="Google Sans", showarrow=False
+                            x=0.23, y=0.5, font_size=17, font_family="Google Sans", showarrow=False
                         )]
                     )
                     st.plotly_chart(fig_pie, use_container_width=True)
@@ -1409,7 +1444,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         ))
 
                         fig_cost.update_layout(
-                            height=300,
+                            height=320,
                             margin=dict(l=20, r=20, t=10, b=30),
                             paper_bgcolor="#FFFFFF",
                             plot_bgcolor="#FFFFFF",
