@@ -38,17 +38,16 @@ def get_static_scope() -> Dict[str, Any]:
 
 def generate_fallback_context(
     step_index: int,
-    prompt_tokens: int = 0,
-    cached_tokens: int = 0,
-    tool_name: Optional[str] = None,
-    user_prompt_preview: Optional[str] = None,
+    prompt_tokens: int,
+    cached_tokens: int,
+    tool_name: str = "",
+    user_prompt_preview: str = "",
 ) -> Dict[str, Any]:
-    """
-    Generates a deterministic structural context map when local raw logs
-    are not available (e.g. on Cloud Run).
-    """
-    cached_ratio = (cached_tokens / prompt_tokens) if prompt_tokens > 0 else 0.0
-    checkpoint_active = cached_ratio > 0.5 or prompt_tokens > 60000
+    c_tok = max(0, cached_tokens)
+    p_uncached = prompt_tokens if prompt_tokens < c_tok else (prompt_tokens - c_tok)
+    tot_prompt = c_tok + p_uncached
+    cached_ratio = (c_tok / tot_prompt) if tot_prompt > 0 else 0.0
+    checkpoint_active = cached_ratio > 0.5 or tot_prompt > 60000
 
     recent_tools = [tool_name] if tool_name else []
 
