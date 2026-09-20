@@ -552,8 +552,17 @@ def load_conversations_for_project(project_name: str):
         MIN(timestamp) as start_time,
         MAX(timestamp) as end_time,
         COUNT(*) as turns,
-        SUM(total_tokens) as total_tokens,
+        SUM(COALESCE(cached_tokens, 0) + 
+            CASE 
+              WHEN prompt_tokens >= COALESCE(cached_tokens, 0) THEN prompt_tokens - COALESCE(cached_tokens, 0)
+              ELSE prompt_tokens 
+            END + 
+            output_tokens) as total_tokens,
         SUM(COALESCE(cached_tokens, 0)) as cached_tokens,
+        SUM(CASE 
+              WHEN prompt_tokens >= COALESCE(cached_tokens, 0) THEN prompt_tokens - COALESCE(cached_tokens, 0)
+              ELSE prompt_tokens 
+            END) as uncached_prompt_tokens,
         SUM(prompt_tokens) as prompt_tokens,
         SUM(output_tokens) as output_tokens,
         SUM(COALESCE(thinking_tokens, 0)) as thinking_tokens,
@@ -576,11 +585,19 @@ def load_turns_for_conversation(conversation_id: str):
         model,
         prompt_tokens,
         COALESCE(cached_tokens, 0) as cached_tokens,
-        GREATEST(0, prompt_tokens - COALESCE(cached_tokens, 0)) as uncached_prompt_tokens,
+        CASE 
+          WHEN prompt_tokens >= COALESCE(cached_tokens, 0) THEN prompt_tokens - COALESCE(cached_tokens, 0)
+          ELSE prompt_tokens 
+        END as uncached_prompt_tokens,
         output_tokens,
         COALESCE(thinking_tokens, 0) as thinking_tokens,
         GREATEST(0, output_tokens - COALESCE(thinking_tokens, 0)) as content_tokens,
-        total_tokens,
+        (COALESCE(cached_tokens, 0) + 
+         CASE 
+           WHEN prompt_tokens >= COALESCE(cached_tokens, 0) THEN prompt_tokens - COALESCE(cached_tokens, 0)
+           ELSE prompt_tokens 
+         END + 
+         output_tokens) as total_tokens,
         latency_ms,
         tokens_per_second,
         ROUND(estimated_cost_usd, 6) as cost_usd,
@@ -1082,25 +1099,24 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 # Fetch row summary from df_convs
                 conv_row = df_convs[df_convs["conversation_id"] == selected_conv_id].iloc[0]
 
-                tot_spend = float(conv_row["cost_usd"])
-                tot_tokens = int(conv_row["total_tokens"])
-                tot_prompt = int(conv_row["prompt_tokens"])
-                tot_cached = int(conv_row["cached_tokens"])
-                tot_uncached = max(0, tot_prompt - tot_cached)
-                tot_output = int(conv_row["output_tokens"])
-                tot_thinking = int(conv_row["thinking_tokens"])
-                tot_content = max(0, tot_output - tot_thinking)
-                tot_turns = int(conv_row["turns"])
+                tot_spend = float(df_turns["cost_usd"].sum()) if not df_turns.empty else float(conv_row["cost_usd"])
+                tot_cached = int(df_turns["cached_tokens"].sum()) if not df_turns.empty else int(conv_row["cached_tokens"])
+                tot_uncached = int(df_turns["uncached_prompt_tokens"].sum()) if not df_turns.empty else int(conv_row.get("uncached_prompt_tokens", 0))
+                tot_thinking = int(df_turns["thinking_tokens"].sum()) if not df_turns.empty else int(conv_row["thinking_tokens"])
+                tot_content = int(df_turns["content_tokens"].sum()) if not df_turns.empty else 0
+                tot_output = tot_thinking + tot_content
+                tot_prompt = tot_cached + tot_uncached
+                tot_tokens = tot_cached + tot_uncached + tot_output
+                tot_turns = len(df_turns) if not df_turns.empty else int(conv_row["turns"])
 
                 # Cache efficiency: % of prompt tokens that came from cache
                 cache_hit_rate = (tot_cached / tot_prompt * 100.0) if tot_prompt > 0 else 0.0
-                cache_hit_rate = min(100.0, max(0.0, cache_hit_rate))
 
                 # Gemini prompt cache discount: $0.15/M -> $0.0375/M (savings = $0.1125/M)
                 dollars_saved = (tot_cached / 1_000_000.0) * 0.1125
 
-                # Peak context window reached (max prompt in any turn)
-                max_prompt_reached = int(df_turns["prompt_tokens"].max()) if not df_turns.empty else 0
+                # Peak context window reached (max prompt in any turn: cached + uncached prompt)
+                max_prompt_reached = int((df_turns["cached_tokens"] + df_turns["uncached_prompt_tokens"]).max()) if not df_turns.empty else 0
                 context_saturation_pct = (max_prompt_reached / 1_048_576.0) * 100.0
 
                 # Formatted values for identical card sizing
@@ -1352,10 +1368,10 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         return f"{int(n):,}"
 
                     tot_all_pie = max(1, tot_tokens)
-                    pct_cached = (tot_cached / tot_all_pie) * 100
-                    pct_uncached = (tot_uncached / tot_all_pie) * 100
-                    pct_thinking = (tot_thinking / tot_all_pie) * 100
-                    pct_content = (tot_content / tot_all_pie) * 100
+                    pct_cached = (tot_cached / tot_all_pie) * 100.0
+                    pct_uncached = (tot_uncached / tot_all_pie) * 100.0
+                    pct_thinking = (tot_thinking / tot_all_pie) * 100.0
+                    pct_content = (tot_content / tot_all_pie) * 100.0
 
                     labels = [
                         f"Cached Prompt: {_fmt_tok_short(tot_cached)} ({pct_cached:.1f}%)",
@@ -1375,6 +1391,12 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         textinfo="none",
                         hoverinfo="label+value+percent",
                         hovertemplate="<b>%{label}</b><br>Tokens: %{value:,}<br>Share: %{percent}<extra></extra>",
+                        title=dict(
+                            text=f"<b>{tokens_str}</b><br><span style='font-size:12px;color:#5F6368;'>Total</span>",
+                            position="middle center",
+                            font=dict(family="Google Sans, sans-serif", size=17, color="#202124"),
+                        ),
+                        sort=False,
                     )])
                     fig_pie.update_layout(
                         height=320,
@@ -1391,10 +1413,6 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             itemclick=False,
                             itemdoubleclick=False,
                         ),
-                        annotations=[dict(
-                            text=f"<b>{tokens_str}</b><br><span style='font-size:11px;color:#5F6368;'>Total</span>",
-                            x=0.23, y=0.5, font_size=17, font_family="Google Sans", showarrow=False
-                        )]
                     )
                     st.plotly_chart(fig_pie, use_container_width=True)
                     st.html("</div>")
@@ -1416,41 +1434,56 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         df_cost["cum_actual_cost"] = df_cost["cost_usd"].cumsum()
                         df_cost["turn_saved"] = (df_cost["cached_tokens"] / 1_000_000.0) * 0.1125
                         df_cost["cum_baseline_cost"] = df_cost["cum_actual_cost"] + df_cost["turn_saved"].cumsum()
-                        df_cost["step_label"] = "Turn " + df_cost["step_index"].astype(str)
+
+                        first_turn_no = int(df_cost["step_index"].iloc[0])
+                        curr_turn_no = int(df_cost["step_index"].iloc[-1])
 
                         fig_cost = go.Figure()
 
                         # Baseline line (Grey dashed)
                         fig_cost.add_trace(go.Scatter(
-                            x=df_cost["step_label"],
+                            x=df_cost["step_index"],
                             y=df_cost["cum_baseline_cost"],
                             name="Without Caching",
                             mode="lines",
                             line=dict(color="#80868B", width=2, dash="dash"),
-                            hovertemplate="<b>%{x}</b><br>Baseline: $%{y:.2f}<extra></extra>",
+                            hovertemplate="<b>Turn #%{x}</b><br>Without Caching: $%{y:.2f}<extra></extra>",
                         ))
 
                         # Actual spend line (Google Blue)
                         fig_cost.add_trace(go.Scatter(
-                            x=df_cost["step_label"],
+                            x=df_cost["step_index"],
                             y=df_cost["cum_actual_cost"],
                             name="Actual Invoiced Spend",
-                            mode="lines+markers",
+                            mode="lines",
                             line=dict(color="#1A73E8", width=3),
-                            marker=dict(size=4, color="#1A73E8"),
                             fill="tonexty",
                             fillcolor="rgba(52, 168, 83, 0.12)",
-                            hovertemplate="<b>%{x}</b><br>Actual Spend: $%{y:.2f}<extra></extra>",
+                            hovertemplate="<b>Turn #%{x}</b><br>Actual Spend: $%{y:.2f}<extra></extra>",
                         ))
 
                         fig_cost.update_layout(
                             height=320,
-                            margin=dict(l=20, r=20, t=10, b=30),
+                            margin=dict(l=20, r=60, t=10, b=40),
                             paper_bgcolor="#FFFFFF",
                             plot_bgcolor="#FFFFFF",
                             font=dict(family="Roboto, sans-serif", size=12, color="#5F6368"),
-                            xaxis=dict(showgrid=False, linecolor="#DADCE0", tickangle=-45 if len(df_cost) > 20 else 0),
-                            yaxis=dict(showgrid=True, gridcolor="#F1F3F4", linecolor="#DADCE0", title="Cumulative USD ($)", tickprefix="$", tickformat=".2f"),
+                            xaxis=dict(
+                                showgrid=False,
+                                linecolor="#DADCE0",
+                                tickvals=[first_turn_no, curr_turn_no],
+                                ticktext=[f"First Turn (#{first_turn_no})", f"Current Turn (#{curr_turn_no})"],
+                                tickangle=0,
+                                tickfont=dict(size=11, family="Google Sans, sans-serif", color="#3C4043"),
+                            ),
+                            yaxis=dict(
+                                showgrid=True,
+                                gridcolor="#F1F3F4",
+                                linecolor="#DADCE0",
+                                title="Cumulative USD ($)",
+                                tickprefix="$",
+                                tickformat=".2f"
+                            ),
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                         )
                         st.plotly_chart(fig_cost, use_container_width=True)
