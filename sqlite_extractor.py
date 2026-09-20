@@ -9,6 +9,14 @@ import sqlite3
 from typing import Any, Dict, List, Optional
 from google.protobuf.internal import decoder
 
+try:
+    from context_extractor import extract_turn_context_metadata
+except ImportError:
+    try:
+        from .context_extractor import extract_turn_context_metadata
+    except Exception:
+        extract_turn_context_metadata = None
+
 CONVERSATIONS_DIR = os.path.expanduser("~/.gemini/antigravity/conversations")
 CONFIG_PROJECTS_DIR = os.path.expanduser("~/.gemini/config/projects")
 
@@ -283,6 +291,19 @@ def extract_conversation_steps(
         if generation_duration_ms and generation_duration_ms > 0:
             tokens_per_second = round(output_tokens / (generation_duration_ms / 1000.0), 1)
 
+        context_meta_json: Optional[str] = None
+        if extract_turn_context_metadata:
+            try:
+                cm = extract_turn_context_metadata(
+                    conversation_id=conversation_id,
+                    step_index=int(idx),
+                    prompt_tokens=prompt_tokens,
+                    cached_tokens=cached_tokens,
+                )
+                context_meta_json = json.dumps(cm)
+            except Exception:
+                pass
+
         record = {
             "conversation_id": conversation_id,
             "step_index": int(idx),
@@ -305,6 +326,7 @@ def extract_conversation_steps(
             "tokens_per_second": tokens_per_second,
             "step_type": "PLANNER_RESPONSE" if step_type == 15 else str(step_type),
             "tool_name": None,
+            "context_metadata": context_meta_json,
             "surface": "app",
         }
         extracted_records.append(record)

@@ -134,6 +134,7 @@ def build_bigquery_rows(
             "estimated_cost_usd": str(cost),
             "step_type": r.get("step_type", "PLANNER_RESPONSE"),
             "tool_name": r.get("tool_name"),
+            "context_metadata": r.get("context_metadata"),
         }
         rows.append(row)
         row_ids.append(event_id)

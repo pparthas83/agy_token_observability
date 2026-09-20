@@ -1,11 +1,23 @@
 import base64
 import datetime
+import json
 import os
+import sys
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from google.cloud import bigquery
+
+# Ensure project root is on sys.path for local helper modules
+_proj_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _proj_root not in sys.path:
+    sys.path.insert(0, _proj_root)
+
+try:
+    import context_extractor
+except Exception:
+    context_extractor = None
 
 # Resolve Antigravity Official Logo
 LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "antigravity_logo_clean.png")
@@ -370,6 +382,88 @@ st.markdown(
         height: 100%;
         border-radius: 4px;
     }
+
+    /* Telemetry Waterfall & Context Map Scoped Styles */
+    .telemetry-header-bar {
+        background: #FFFFFF;
+        border: 1px solid #DADCE0;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.06);
+    }
+    .telemetry-kpi-card {
+        background: #FFFFFF;
+        border: 1px solid #DADCE0;
+        border-radius: 8px;
+        padding: 14px 16px;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.08);
+        min-height: 110px;
+        max-height: 110px;
+        height: 110px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-sizing: border-box;
+    }
+    .context-card {
+        background: #FFFFFF;
+        border: 1px solid #DADCE0;
+        border-radius: 8px;
+        padding: 16px 18px;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.06);
+        box-sizing: border-box;
+        height: 100%;
+    }
+    .context-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: 'Google Sans', sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        color: #202124;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #F1F3F4;
+    }
+    .context-card-item {
+        font-size: 12px;
+        color: #3C4043;
+        line-height: 1.5;
+        margin-bottom: 7px;
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+    }
+    .context-card-badge {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        font-family: 'Roboto Mono', monospace;
+    }
+    .context-footprint-container {
+        background: #FFFFFF;
+        border: 1px solid #DADCE0;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.06);
+    }
+    .context-bar-segmented {
+        display: flex;
+        width: 100%;
+        height: 14px;
+        border-radius: 7px;
+        overflow: hidden;
+        margin-top: 10px;
+        margin-bottom: 8px;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -603,6 +697,44 @@ def load_turns_for_conversation(conversation_id: str):
         ROUND(estimated_cost_usd, 6) as cost_usd,
         tool_name,
         step_type
+    FROM `{GCP_PROJECT}.{DATASET_ID}.antigravity_token_events`
+    WHERE conversation_id = '{conversation_id}'
+    ORDER BY step_index ASC
+    """
+    return run_query(query)
+
+
+@st.cache_data(ttl=60)
+def load_telemetry_for_conversation(conversation_id: str):
+    query = f"""
+    SELECT
+        step_index,
+        timestamp,
+        model,
+        prompt_tokens,
+        COALESCE(cached_tokens, 0) as cached_tokens,
+        CASE 
+          WHEN prompt_tokens >= COALESCE(cached_tokens, 0) THEN prompt_tokens - COALESCE(cached_tokens, 0)
+          ELSE prompt_tokens 
+        END as uncached_prompt_tokens,
+        output_tokens,
+        COALESCE(thinking_tokens, 0) as thinking_tokens,
+        GREATEST(0, output_tokens - COALESCE(thinking_tokens, 0)) as content_tokens,
+        (COALESCE(cached_tokens, 0) + 
+         CASE 
+           WHEN prompt_tokens >= COALESCE(cached_tokens, 0) THEN prompt_tokens - COALESCE(cached_tokens, 0)
+           ELSE prompt_tokens 
+         END + 
+         output_tokens) as total_tokens,
+        COALESCE(client_prep_ms, 0) as client_prep_ms,
+        COALESCE(ttft_latency_ms, latency_ms, 0) as ttft_latency_ms,
+        COALESCE(generation_duration_ms, 0) as generation_duration_ms,
+        latency_ms,
+        tokens_per_second,
+        ROUND(estimated_cost_usd, 6) as cost_usd,
+        tool_name,
+        step_type,
+        context_metadata
     FROM `{GCP_PROJECT}.{DATASET_ID}.antigravity_token_events`
     WHERE conversation_id = '{conversation_id}'
     ORDER BY step_index ASC
@@ -1597,21 +1729,670 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         )
 
     elif "Token Telemetry" in selected_nav:
-        st.html(
+        # Load project list
+        df_p_list = load_deepdive_projects()
+        if df_p_list.empty:
+            st.warning("No projects found in BigQuery telemetry.")
+            st.stop()
+
+        # 1. Project & Conversation Selectors
+        c_p, c_c = st.columns([1, 1.8])
+        with c_p:
+            proj_names = df_p_list["antigravity_project_name"].tolist()
+            def_proj_idx = 0
+            for i, p in enumerate(proj_names):
+                if "token_observability" in p.lower() or "project_4" in p.lower():
+                    def_proj_idx = i
+                    break
+            selected_project = st.selectbox(
+                "PROJECT SCOPE", proj_names, index=def_proj_idx, key="telem_proj_select"
+            )
+
+        with c_c:
+            df_c_list = load_conversations_for_project(selected_project)
+            if df_c_list.empty:
+                st.info("No conversations found for selected project.")
+                st.stop()
+            conv_map = {}
+            for _, crow in df_c_list.iterrows():
+                cid = str(crow["conversation_id"])
+                lbl = f"{cid[:8]}... ({int(crow['turns']):,} turns | ${float(crow['cost_usd']):,.2f} | {crow['start_time'].strftime('%b %d %H:%M')})"
+                conv_map[lbl] = cid
+            selected_conv_lbl = st.selectbox(
+                "AGENT SESSION (CONVERSATION ID)", list(conv_map.keys()), index=0, key="telem_conv_select"
+            )
+            selected_conv_id = conv_map[selected_conv_lbl]
+
+        # 2. Load Telemetry Data
+        df_telem = load_telemetry_for_conversation(selected_conv_id)
+        if df_telem.empty:
+            st.info("No telemetry events found for this conversation session.")
+            st.stop()
+
+        total_turns_count = len(df_telem)
+        step_indices = df_telem["step_index"].tolist()
+        min_step = int(df_telem["step_index"].min())
+        max_step = int(df_telem["step_index"].max())
+
+        # 3. Turn Window Controls (default last 20 turns)
+        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+        c_w1, c_w2 = st.columns([3, 1])
+        with c_w1:
+            if len(step_indices) > 20:
+                default_start = step_indices[max(0, len(step_indices) - 20)]
+                turn_range = st.slider(
+                    "Sequential Turn Window (Displaying last 20 by default; drag to scrub earlier turns)",
+                    min_value=min_step,
+                    max_value=max_step,
+                    value=(default_start, max_step),
+                    key=f"telem_slider_{selected_conv_id}",
+                )
+            else:
+                turn_range = (min_step, max_step)
+        with c_w2:
+            st.markdown(
+                f"<div style='font-size: 11px; color: #5F6368; padding-top: 24px; text-align: right;'>"
+                f"Total Session: <strong>{total_turns_count:,}</strong> sequential turns"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        df_window = df_telem[
+            (df_telem["step_index"] >= turn_range[0]) & (df_telem["step_index"] <= turn_range[1])
+        ].copy()
+        if df_window.empty:
+            df_window = df_telem.tail(20).copy()
+
+        # 4. Sequential Gantt Waterfall Trace (Plotly)
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        st.markdown(
             """
-            <div class="gcp-card" style="text-align: center; padding: 60px 24px; margin-top: 20px;">
-                <div style="font-size: 3.5rem; margin-bottom: 12px;">⚡</div>
-                <h2 style="font-size: 1.4rem; font-weight: 600; color: #202124; font-family: 'Google Sans'; margin-bottom: 8px;">
-                    Step 3: Token Telemetry (Gantt Waterfall)
-                </h2>
-                <p style="font-size: 0.9rem; color: #5F6368; max-width: 500px; margin: 0 auto; line-height: 1.5;">
-                    We are building one page at a time. The <strong>Executive Overview</strong> is now complete and sleek! 
-                    Next up after Tokenomics is the visual Datadog-style sequential Gantt waterfall trace.
-                </p>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div>
+                    <span style="font-size: 15px; font-weight: 700; color: #202124; font-family: 'Google Sans';">
+                        ⚡ Sequential Gantt Waterfall Trace
+                    </span>
+                    <span style="font-size: 12px; color: #5F6368; margin-left: 8px;">
+                        (Client Prep → TTFT Server Prefill → Thinking Reasoning → Streaming Output)
+                    </span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Prepare latency segments
+        df_window["client_prep_s"] = (df_window["client_prep_ms"] / 1000.0).clip(lower=0.0)
+        df_window["ttft_s"] = (df_window["ttft_latency_ms"] / 1000.0).clip(lower=0.0)
+
+        # Calculate thinking vs streaming duration
+        gen_duration_s = (df_window["generation_duration_ms"] / 1000.0).clip(lower=0.0)
+        out_tokens = df_window["output_tokens"].replace(0, 1)
+        thk_tokens = df_window["thinking_tokens"].fillna(0)
+        thk_ratio = (thk_tokens / out_tokens).clip(0.0, 1.0)
+
+        df_window["thinking_s"] = gen_duration_s * thk_ratio
+        df_window["streaming_s"] = (gen_duration_s - df_window["thinking_s"]).clip(lower=0.0)
+        df_window["total_latency_s"] = (
+            df_window["client_prep_s"] + df_window["ttft_s"] + gen_duration_s
+        )
+
+        turn_labels = [f"Turn #{s}" for s in df_window["step_index"]]
+
+        fig_waterfall = go.Figure()
+
+        # 1. Client Prep (Slate)
+        fig_waterfall.add_trace(
+            go.Bar(
+                y=turn_labels,
+                x=df_window["client_prep_s"],
+                name="Client Prep",
+                orientation="h",
+                marker=dict(color="#5F6368"),
+                customdata=df_window[["client_prep_ms", "step_index", "model"]],
+                hovertemplate="<b>%{y}</b><br>Client Prep: %{customdata[0]:,} ms<br>Context assembly & tool ingestion<extra></extra>",
+            )
+        )
+
+        # 2. TTFT Server Prefill (Amber)
+        fig_waterfall.add_trace(
+            go.Bar(
+                y=turn_labels,
+                x=df_window["ttft_s"],
+                name="TTFT (Prefill)",
+                orientation="h",
+                marker=dict(color="#FBBC04"),
+                customdata=df_window[["ttft_latency_ms", "prompt_tokens", "cached_tokens"]],
+                hovertemplate="<b>%{y}</b><br>TTFT: %{customdata[0]:,} ms<br>Prompt: %{customdata[1]:,} tok (%{customdata[2]:,} cached)<extra></extra>",
+            )
+        )
+
+        # 3. Thinking Phase (Purple)
+        fig_waterfall.add_trace(
+            go.Bar(
+                y=turn_labels,
+                x=df_window["thinking_s"],
+                name="Thinking Reasoning",
+                orientation="h",
+                marker=dict(color="#A142F4"),
+                customdata=df_window[["thinking_tokens", "thinking_s"]],
+                hovertemplate="<b>%{y}</b><br>Thinking: %{x:.2f}s<br>Reasoning Tokens: %{customdata[0]:,}<extra></extra>",
+            )
+        )
+
+        # 4. Streaming Output (Google Blue)
+        fig_waterfall.add_trace(
+            go.Bar(
+                y=turn_labels,
+                x=df_window["streaming_s"],
+                name="Output Streaming",
+                orientation="h",
+                marker=dict(color="#1A73E8"),
+                customdata=df_window[["content_tokens", "tokens_per_second", "total_latency_s"]],
+                hovertemplate="<b>%{y}</b><br>Streaming: %{x:.2f}s<br>Content Tokens: %{customdata[0]:,}<br>Speed: %{customdata[1]:.1f} tok/s<br><b>Total Turn Time: %{customdata[2]:.2f}s</b><extra></extra>",
+            )
+        )
+
+        waterfall_height = max(340, len(df_window) * 26 + 90)
+
+        fig_waterfall.update_layout(
+            barmode="stack",
+            height=waterfall_height,
+            margin=dict(l=10, r=20, t=30, b=30),
+            paper_bgcolor="#FFFFFF",
+            plot_bgcolor="#FFFFFF",
+            font=dict(family="'Google Sans', 'Roboto', sans-serif", size=12, color="#202124"),
+            xaxis=dict(
+                title=dict(text="Turn Execution Duration (Seconds)", font=dict(size=12, color="#5F6368")),
+                gridcolor="#F1F3F4",
+                zeroline=False,
+            ),
+            yaxis=dict(
+                autorange="reversed",  # Sequential waterfall flowing top to bottom
+                gridcolor="#F8F9FA",
+                tickfont=dict(family="'Roboto Mono', monospace", size=11, color="#1A73E8"),
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                font=dict(size=11, color="#3C4043"),
+            ),
+        )
+
+        st.plotly_chart(fig_waterfall, use_container_width=True)
+
+        # 5. Interactive Turn Selector for Context Inspector
+        st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+        turn_options = df_window["step_index"].tolist()
+        def_turn_idx = len(turn_options) - 1
+
+        c_t1, c_t2 = st.columns([2, 1])
+        with c_t1:
+            st.markdown(
+                """
+                <div style="font-size: 16px; font-weight: 700; color: #202124; font-family: 'Google Sans';">
+                    🔍 Structural Context Inspector (Context Map)
+                </div>
+                <div style="font-size: 12px; color: #5F6368; margin-top: 2px;">
+                    Select any turn above to inspect the exact architectural building blocks that formed the model's prompt.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with c_t2:
+            selected_step = st.selectbox(
+                "SELECT TURN TO INSPECT",
+                turn_options,
+                index=def_turn_idx,
+                key="selected_telemetry_turn",
+                format_func=lambda s: f"Turn #{s} ({df_window.loc[df_window['step_index']==s, 'total_tokens'].values[0]:,} tokens | ${float(df_window.loc[df_window['step_index']==s, 'cost_usd'].values[0]):.4f})",
+            )
+
+        # 6. Extract metrics for selected turn
+        turn_row = df_window[df_window["step_index"] == selected_step].iloc[0]
+        prep_ms = int(turn_row["client_prep_ms"])
+        ttft_ms = int(turn_row["ttft_latency_ms"])
+        gen_ms = int(turn_row["generation_duration_ms"])
+        tot_s = float(turn_row["total_latency_s"])
+        p_tok = int(turn_row["prompt_tokens"])
+        c_tok = int(turn_row["cached_tokens"])
+        fresh_tok = max(0, p_tok - c_tok)
+        cache_pct = round((c_tok / p_tok * 100), 1) if p_tok > 0 else 0.0
+        fresh_pct = round(100.0 - cache_pct, 1)
+        thk_tok = int(turn_row["thinking_tokens"])
+        cnt_tok = int(turn_row["content_tokens"])
+        speed = (
+            float(turn_row["tokens_per_second"])
+            if pd.notnull(turn_row["tokens_per_second"])
+            else 0.0
+        )
+        model_name = str(turn_row["model"])
+
+        # 7. Turn Summary KPI Cards (Matching Exact 110px Height)
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        tk1, tk2, tk3, tk4 = st.columns(4)
+
+        with tk1:
+            st.html(
+                f"""
+                <div class="telemetry-kpi-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #5F6368; letter-spacing: 0.5px;">TURN LATENCY</span>
+                        <div class="kpi-icon-container" style="background: #E8F0FE; color: #1A73E8;">⏱️</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.45rem; font-weight: 700; color: #202124; font-family: 'Google Sans', sans-serif;">{tot_s:.2f}s</div>
+                        <div style="font-size: 11px; color: #5F6368; margin-top: 2px;">TTFT: {ttft_ms/1000.0:.2f}s | Stream: {gen_ms/1000.0:.2f}s</div>
+                    </div>
+                </div>
+                """
+            )
+
+        with tk2:
+            st.html(
+                f"""
+                <div class="telemetry-kpi-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #5F6368; letter-spacing: 0.5px;">PROMPT CONTEXT</span>
+                        <div class="kpi-icon-container" style="background: #E6F4EA; color: #137333;">💾</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.45rem; font-weight: 700; color: #202124; font-family: 'Google Sans', sans-serif;">{fmt_tok(p_tok)}</div>
+                        <div style="font-size: 11px; color: #5F6368; margin-top: 2px;">{cache_pct}% Cached | {fresh_pct}% Fresh</div>
+                    </div>
+                </div>
+                """
+            )
+
+        with tk3:
+            st.html(
+                f"""
+                <div class="telemetry-kpi-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #5F6368; letter-spacing: 0.5px;">GENERATION FOOTPRINT</span>
+                        <div class="kpi-icon-container" style="background: #F3E8FD; color: #8430CE;">🧠</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.45rem; font-weight: 700; color: #202124; font-family: 'Google Sans', sans-serif;">{int(turn_row['output_tokens']):,} tok</div>
+                        <div style="font-size: 11px; color: #5F6368; margin-top: 2px;">Thinking: {thk_tok:,} | Content: {cnt_tok:,}</div>
+                    </div>
+                </div>
+                """
+            )
+
+        with tk4:
+            st.html(
+                f"""
+                <div class="telemetry-kpi-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #5F6368; letter-spacing: 0.5px;">STREAMING VELOCITY</span>
+                        <div class="kpi-icon-container" style="background: #FEF7E0; color: #B06000;">⚡</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.45rem; font-weight: 700; color: #202124; font-family: 'Google Sans', sans-serif;">{speed:.1f} tok/s</div>
+                        <div style="font-size: 11px; color: #5F6368; margin-top: 2px;">Model: {model_name}</div>
+                    </div>
+                </div>
+                """
+            )
+
+        # 8. Directional Context Footprint Bar
+        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+        cache_status_badge = (
+            '<span class="context-card-badge" style="background: #E6F4EA; color: #137333;">🟢 HIGH CACHE EFFICIENCY</span>'
+            if cache_pct >= 70
+            else '<span class="context-card-badge" style="background: #FEF7E0; color: #B06000;">🟡 MODERATE CACHE</span>'
+            if cache_pct >= 30
+            else '<span class="context-card-badge" style="background: #FCE8E6; color: #C5221F;">🔴 COLD PREFILL (CACHE MISS)</span>'
+        )
+
+        st.html(
+            f"""
+            <div class="context-footprint-container">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span style="font-size: 13px; font-weight: 700; color: #202124; font-family: 'Google Sans', sans-serif;">
+                            🗺️ Directional Context Footprint: Turn #{selected_step}
+                        </span>
+                        <span style="font-size: 12px; color: #5F6368; margin-left: 8px;">
+                            (Total Prompt: {p_tok:,} tokens)
+                        </span>
+                    </div>
+                    <div>{cache_status_badge}</div>
+                </div>
+                <div class="context-bar-segmented">
+                    <div style="width: {cache_pct}%; background-color: #34A853; height: 100%;" title="Cached Memory: {c_tok:,} tokens ({cache_pct}%)"></div>
+                    <div style="width: {fresh_pct}%; background-color: #FBBC04; height: 100%;" title="Fresh Working Injections: {fresh_tok:,} tokens ({fresh_pct}%)"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #5F6368;">
+                    <span>🟢 <strong>{cache_pct}% Cached Memory</strong> ({c_tok:,} tokens from session checkpoint & earlier turns)</span>
+                    <span>🟠 <strong>{fresh_pct}% Fresh Injections</strong> ({fresh_tok:,} tokens from latest tool outputs & user prompt)</span>
+                </div>
             </div>
             """
         )
 
+        # 9. Extract Structural Context Metadata
+        cm_raw = turn_row.get("context_metadata")
+        cm = None
+        if pd.notnull(cm_raw) and str(cm_raw).strip() not in ("", "None", "NULL"):
+            try:
+                cm = json.loads(str(cm_raw))
+            except Exception:
+                pass
+
+        if cm is None and context_extractor:
+            try:
+                cm = context_extractor.extract_turn_context_metadata(
+                    conversation_id=selected_conv_id,
+                    step_index=int(selected_step),
+                    prompt_tokens=p_tok,
+                    cached_tokens=c_tok,
+                )
+            except Exception:
+                pass
+
+        if cm is None:
+            if context_extractor:
+                cm = context_extractor.generate_fallback_context(
+                    step_index=int(selected_step),
+                    prompt_tokens=p_tok,
+                    cached_tokens=c_tok,
+                    tool_name=str(turn_row.get("tool_name", "")),
+                )
+            else:
+                cm = {
+                    "user_request_preview": "User prompt and task directives",
+                    "timestamp": "",
+                    "has_media": False,
+                    "media_files": [],
+                    "checkpoint_active": cache_pct > 50,
+                    "checkpoint_step_index": 0 if cache_pct > 50 else None,
+                    "working_injections": {
+                        "command_runs": 1,
+                        "file_reads": 1,
+                        "file_edits": 0,
+                        "web_searches": 0,
+                        "recent_commands": [],
+                        "recent_files": [],
+                        "intermediate_tools": [],
+                    },
+                    "static_scope": {
+                        "native_tools_count": 14,
+                        "native_tools_sample": ["run_command", "view_file", "replace_file_content"],
+                        "mcp_servers": ["cloudrun", "gmp-code-assist", "sequential-thinking"],
+                        "skills_count": 42,
+                        "rules_count": 0,
+                        "persona": "Antigravity Autonomous Pair Programmer",
+                        "os": "Linux x86_64",
+                    },
+                }
+
+        scope = cm.get("static_scope", {})
+        working = cm.get("working_injections", {})
+        chk_active = cm.get("checkpoint_active", False)
+        chk_idx = cm.get("checkpoint_step_index")
+        has_media = cm.get("has_media", False)
+        media_list = cm.get("media_files", [])
+
+        # 10. The 5 Structural Context Cards (2-Row Uniform Grid)
+        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+
+        # Row 1: Static Directives, Tool Registry, Skills in Scope (3 Columns)
+        c_sc1, c_sc2, c_sc3 = st.columns(3)
+
+        with c_sc1:
+            st.html(
+                f"""
+                <div class="context-card">
+                    <div class="context-card-header">
+                        <span style="font-size: 15px;">🏛️</span>
+                        <span>1. Static Directives & Persona</span>
+                    </div>
+                    <div class="context-card-item">
+                        <span>🤖</span>
+                        <div><strong>Role:</strong> {scope.get('persona', 'Antigravity AI Pair Programmer')}</div>
+                    </div>
+                    <div class="context-card-item">
+                        <span>💻</span>
+                        <div><strong>Host OS:</strong> {scope.get('os', 'Linux x86_64')}</div>
+                    </div>
+                    <div class="context-card-item">
+                        <span>📋</span>
+                        <div><strong>Global & Project Rules:</strong> {scope.get('rules_count', 0)} active</div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 11px; color: #5F6368; border-top: 1px dashed #E8EAED; padding-top: 6px;">
+                        Fixed base system envelope (~1,200 tokens)
+                    </div>
+                </div>
+                """
+            )
+
+        with c_sc2:
+            mcp_badges = " ".join(
+                [f'<span class="context-card-badge" style="background: #E8F0FE; color: #1967D2;">{s}</span>' for s in scope.get('mcp_servers', [])]
+            )
+            st.html(
+                f"""
+                <div class="context-card">
+                    <div class="context-card-header">
+                        <span style="font-size: 15px;">🛠️</span>
+                        <span>2. Capabilities & Tool Registry</span>
+                    </div>
+                    <div class="context-card-item">
+                        <span>⚙️</span>
+                        <div><strong>Native Tools:</strong> {scope.get('native_tools_count', 14)} declared</div>
+                    </div>
+                    <div class="context-card-item" style="flex-wrap: wrap;">
+                        <span>🔌</span>
+                        <div><strong>Active MCP Servers:</strong><br><div style="margin-top: 4px; display: flex; gap: 4px; flex-wrap: wrap;">{mcp_badges}</div></div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 11px; color: #5F6368; border-top: 1px dashed #E8EAED; padding-top: 6px;">
+                        Full function calling JSON schemas (~5,500 tokens)
+                    </div>
+                </div>
+                """
+            )
+
+        with c_sc3:
+            st.html(
+                f"""
+                <div class="context-card">
+                    <div class="context-card-header">
+                        <span style="font-size: 15px;">🧩</span>
+                        <span>3. Skills in Scope</span>
+                    </div>
+                    <div class="context-card-item">
+                        <span>📚</span>
+                        <div><strong>Registered Skills:</strong> {scope.get('skills_count', 42)} skills</div>
+                    </div>
+                    <div class="context-card-item">
+                        <span>⚡</span>
+                        <div><strong>Disclosure Mode:</strong> <span class="context-card-badge" style="background: #E6F4EA; color: #137333;">Progressive</span></div>
+                    </div>
+                    <div class="context-card-item">
+                        <span>🎯</span>
+                        <div><strong>Categories:</strong> Cloud, Data, Frontend, Science</div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 11px; color: #5F6368; border-top: 1px dashed #E8EAED; padding-top: 6px;">
+                        Lightweight catalog in prompt; full skill loaded on-demand
+                    </div>
+                </div>
+                """
+            )
+
+        # Row 2: Working Injections, User Request & Media (2 Columns)
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        c_sc4, c_sc5 = st.columns([1.3, 1])
+
+        with c_sc4:
+            chk_label = (
+                f'<span class="context-card-badge" style="background: #E8F0FE; color: #1967D2;">Active Checkpoint (Step #{chk_idx})</span>'
+                if chk_active
+                else '<span class="context-card-badge" style="background: #F1F3F4; color: #5F6368;">Raw Trajectory Window</span>'
+            )
+            recent_cmds = working.get("recent_commands", [])
+            recent_files = working.get("recent_files", [])
+
+            cmd_html = (
+                f'<div style="font-family: \'Roboto Mono\', monospace; font-size: 11px; color: #202124; background: #F8F9FA; padding: 4px 8px; border-radius: 4px; margin-top: 4px;">$ {recent_cmds[0]}</div>'
+                if recent_cmds
+                else '<span style="color: #80868B; font-size: 11px;">None</span>'
+            )
+            file_html = (
+                ", ".join([f'<code>{f}</code>' for f in recent_files])
+                if recent_files
+                else '<span style="color: #80868B; font-size: 11px;">None</span>'
+            )
+
+            st.html(
+                f"""
+                <div class="context-card">
+                    <div class="context-card-header">
+                        <span style="font-size: 15px;">📥</span>
+                        <span>4. Working Injections (Preceding Tool Payloads)</span>
+                    </div>
+                    <div class="context-card-item">
+                        <span>🧠</span>
+                        <div><strong>Memory State:</strong> {chk_label}</div>
+                    </div>
+                    <div class="context-card-item">
+                        <span>💻</span>
+                        <div><strong>Command Outputs:</strong> {working.get('command_runs', 0)} executed {cmd_html}</div>
+                    </div>
+                    <div class="context-card-item">
+                        <span>📄</span>
+                        <div><strong>File Injections:</strong> {working.get('file_reads', 0)} reads {file_html}</div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 11px; color: #5F6368; border-top: 1px dashed #E8EAED; padding-top: 6px;">
+                        Intermediate execution payloads that fed directly into this turn
+                    </div>
+                </div>
+                """
+            )
+
+        with c_sc5:
+            prompt_snip = cm.get("user_request_preview", "User prompt in scope")
+            ts_label = cm.get("timestamp") or str(turn_row["timestamp"])[:19]
+            media_badge = (
+                f'<span class="context-card-badge" style="background: #E8F0FE; color: #1967D2;">📸 {len(media_list)} Image(s) Attached</span>'
+                if has_media
+                else '<span class="context-card-badge" style="background: #F1F3F4; color: #80868B;">No Media</span>'
+            )
+
+            st.html(
+                f"""
+                <div class="context-card">
+                    <div class="context-card-header">
+                        <span style="font-size: 15px;">💬</span>
+                        <span>5. User Request & Multimodal</span>
+                    </div>
+                    <div class="context-card-item">
+                        <span>🕒</span>
+                        <div><strong>Dispatched:</strong> {ts_label}</div>
+                    </div>
+                    <div class="context-card-item">
+                        <span>🖼️</span>
+                        <div><strong>Multimodal:</strong> {media_badge}</div>
+                    </div>
+                    <div class="context-card-item" style="flex-direction: column;">
+                        <span style="font-weight: 600; font-size: 11px; color: #5F6368; margin-bottom: 2px;">USER DIRECTIVE:</span>
+                        <div style="background: #F8F9FA; border-left: 3px solid #1A73E8; padding: 6px 10px; font-size: 11px; color: #202124; line-height: 1.4; border-radius: 0 4px 4px 0; max-height: 70px; overflow-y: auto;">
+                            "{prompt_snip}"
+                        </div>
+                    </div>
+                </div>
+                """
+            )
+
+        # 11. TTFT vs. Prompt Size Correlation Scatter Plot (Analytical Insight)
+        st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <div>
+                    <span style="font-size: 15px; font-weight: 700; color: #202124; font-family: 'Google Sans';">
+                        📈 TTFT Latency vs. Prompt Size Correlation
+                    </span>
+                    <span style="font-size: 12px; color: #5F6368; margin-left: 8px;">
+                        (Verifies how prompt caching prevents TTFT latency explosion as session history grows)
+                    </span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        df_scatter = df_telem.copy()
+        df_scatter["prompt_k"] = df_scatter["prompt_tokens"] / 1000.0
+        df_scatter["ttft_s"] = df_scatter["ttft_latency_ms"] / 1000.0
+        df_scatter["cache_hit_rate"] = (
+            (df_scatter["cached_tokens"] / df_scatter["prompt_tokens"]).clip(0.0, 1.0) * 100
+        ).round(1)
+        df_scatter["cache_status"] = df_scatter["cache_hit_rate"].apply(
+            lambda x: "Cache Hit (>=70%)" if x >= 70 else "Cache Miss / Cold (<70%)"
+        )
+
+        fig_corr = px.scatter(
+            df_scatter,
+            x="prompt_k",
+            y="ttft_s",
+            color="cache_status",
+            color_discrete_map={
+                "Cache Hit (>=70%)": "#34A853",
+                "Cache Miss / Cold (<70%)": "#EA4335",
+            },
+            hover_data={
+                "step_index": True,
+                "prompt_tokens": True,
+                "cached_tokens": True,
+                "ttft_latency_ms": True,
+                "tokens_per_second": True,
+                "prompt_k": False,
+                "ttft_s": False,
+                "cache_status": False,
+            },
+            labels={
+                "prompt_k": "Total Prompt Tokens (k)",
+                "ttft_s": "Time to First Token (Seconds)",
+                "cache_status": "Cache Status",
+            },
+        )
+
+        fig_corr.update_traces(marker=dict(size=9, opacity=0.85, line=dict(width=1, color="#FFFFFF")))
+
+        fig_corr.update_layout(
+            height=320,
+            margin=dict(l=10, r=20, t=20, b=20),
+            paper_bgcolor="#FFFFFF",
+            plot_bgcolor="#FFFFFF",
+            font=dict(family="'Google Sans', 'Roboto', sans-serif", size=12, color="#202124"),
+            xaxis=dict(
+                title=dict(text="Total Prompt Size (Thousands of Tokens)", font=dict(size=12, color="#5F6368")),
+                gridcolor="#F1F3F4",
+            ),
+            yaxis=dict(
+                title=dict(text="TTFT Latency (Seconds)", font=dict(size=12, color="#5F6368")),
+                gridcolor="#F1F3F4",
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                font=dict(size=11, color="#3C4043"),
+            ),
+        )
+
+        st.plotly_chart(fig_corr, use_container_width=True)
+
 except Exception as e:
-    st.error(f"Error loading Executive Overview from BigQuery: {e}")
-    st.info(f"Make sure Cloud Run service account has BigQuery read permissions on {GCP_PROJECT}.{DATASET_ID}.")
+    st.error(f"Error loading Token Observability dashboard: {e}")
+    st.info(
+        f"Make sure Cloud Run service account has BigQuery read permissions on {GCP_PROJECT}.{DATASET_ID}."
+    )
+
