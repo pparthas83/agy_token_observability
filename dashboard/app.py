@@ -29,7 +29,7 @@ else:
 
 # Page Configuration
 st.set_page_config(
-    page_title="Your Antigravity Token Analytics",
+    page_title="My Antigravity Token Analytics",
     page_icon=LOGO_PATH if os.path.exists(LOGO_PATH) else "⚡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -764,44 +764,35 @@ with st.sidebar:
         f"""
         <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0 14px 0; border-bottom: 1px solid #DADCE0; margin-bottom: 14px;">
             <img src="{LOGO_URI}" width="32" height="32" style="object-fit: contain;" alt="Antigravity Logo" />
-            <div>
-                <span style="font-size: 15px; font-weight: 700; color: #202124; font-family: 'Google Sans', sans-serif;">Your Antigravity</span><br/>
-                <span style="font-size: 11px; color: #5F6368; font-family: 'Roboto', sans-serif;">Token Analytics</span>
+            <div style="font-size: 14px; font-weight: 700; color: #202124; font-family: 'Google Sans', sans-serif; line-height: 1.25;">
+                My Antigravity<br/>Token Analytics
             </div>
         </div>
         """
     )
 
-    # 3. Project Scope Card (No toggle arrow, mentions Cloud ID & Cloud Project)
+    # 3. Project Scope Card (Mentions Cloud Project & Cloud Account in uniform styling)
     st.html(
         f"""
         <div style="background: #F8F9FA; border: 1px solid #DADCE0; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 12px;">
-            <div style="color: #5F6368; font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.6px; margin-bottom: 8px;">
+            <div style="color: #5F6368; font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.6px; margin-bottom: 8px; font-family: 'Google Sans', sans-serif;">
                 PROJECT SCOPE
             </div>
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <span style="color: #5F6368; font-size: 11px;">Cloud Project:</span>
-                    <span style="font-weight: 600; color: #1A73E8; font-family: 'Roboto Mono', monospace; font-size: 12px;">{GCP_PROJECT}</span>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #5F6368; font-size: 11px; font-weight: 500; font-family: 'Google Sans', sans-serif;">Cloud Project:</span>
+                    <span style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace; font-size: 11px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{GCP_PROJECT}">{GCP_PROJECT}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <span style="color: #5F6368; font-size: 11px;">Cloud ID:</span>
-                    <span style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace; font-size: 12px;" title="Argolis Account: {ARGOLIS_ACCOUNT}">{CLOUD_ID}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <span style="color: #5F6368; font-size: 11px;">Argolis Account:</span>
-                    <span style="font-weight: 500; color: #5F6368; font-family: 'Roboto Mono', monospace; font-size: 10px; max-width: 125px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{ARGOLIS_ACCOUNT}">{ARGOLIS_ACCOUNT}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px; padding-top: 4px; border-top: 1px dashed #E8EAED;">
-                    <span style="color: #70757A; font-size: 10px;">Dataset:</span>
-                    <span style="color: #5F6368; font-size: 10px; font-family: 'Roboto Mono', monospace;">token_analytics</span>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #5F6368; font-size: 11px; font-weight: 500; font-family: 'Google Sans', sans-serif;">Cloud Account:</span>
+                    <span style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace; font-size: 11px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{ARGOLIS_ACCOUNT}">{ARGOLIS_ACCOUNT}</span>
                 </div>
             </div>
         </div>
         """
     )
 
-    st.html('<div style="font-size: 10px; font-weight: 700; color: #5F6368; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; padding-left: 2px;">NAVIGATION</div>')
+    st.html('<div style="font-size: 10px; font-weight: 700; color: #5F6368; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; padding-left: 2px; font-family: \'Google Sans\', sans-serif;">NAVIGATION</div>')
 
     # 2. Navigation Menus aligned to top-left
     selected_nav = st.radio(
@@ -816,27 +807,9 @@ with st.sidebar:
     )
 
     st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
-    if st.button("🔄  Refresh BigQuery Cache", use_container_width=True):
+    if st.button("Refresh Tokenomics Cache", icon=":material/refresh:", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
-
-    # Telemetry Status Card
-    st.html(
-        """
-        <div style="margin-top: 24px; padding: 12px 14px; background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 8px; font-size: 11px; color: #5F6368; box-shadow: 0 1px 2px rgba(60,64,67,0.06);">
-            <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #70757A; letter-spacing: 0.5px; margin-bottom: 6px;">
-                SYSTEM TELEMETRY
-            </div>
-            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #34A853; display: inline-block;"></span>
-                <strong style="color: #202124; font-family: 'Google Sans'; font-size: 12px;">BigQuery Stream Active</strong>
-            </div>
-            <div style="color: #5F6368; font-size: 11px; line-height: 1.4;">
-                Workstation telemetry streams automatically at the end of every agent execution loop.
-            </div>
-        </div>
-        """
-    )
 
 
 # ==========================================
@@ -847,12 +820,12 @@ try:
     df_daily = load_daily_spend()
     df_projects = load_project_portfolio()
 
-    # 4. Top Breadcrumb: Your Antigravity Token Analytics -> Executive Overview
+    # 4. Top Breadcrumb: My Antigravity Token Analytics -> Executive Overview
     nav_title = selected_nav.replace("📊", "").replace("🔬", "").replace("⚡", "").strip()
     st.html(
         f"""
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid #DADCE0;">
-            <span style="font-size: 13px; color: #5F6368; font-family: 'Google Sans', sans-serif;">Your Antigravity Token Analytics</span>
+            <span style="font-size: 13px; color: #5F6368; font-family: 'Google Sans', sans-serif;">My Antigravity Token Analytics</span>
             <span style="color: #DADCE0; font-size: 13px;">→</span>
             <span style="font-size: 13px; font-weight: 600; color: #1A73E8; font-family: 'Google Sans', sans-serif;">{nav_title}</span>
         </div>

@@ -121,3 +121,32 @@ def test_extract_turn_context_nonexistent_conv():
     assert res["step_index"] == 5
     assert res["checkpoint_active"] is False
     assert res["static_scope"]["native_tools_count"] == 14
+
+
+def test_sidebar_navigation_elements():
+    """Verify left navigation panel branding, project scope, and button changes."""
+    with open("dashboard/app.py", "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # 1. System Telemetry section must be removed
+    assert "SYSTEM TELEMETRY" not in content
+    assert "BigQuery Stream Active" not in content
+
+    # 2. Refresh Tokenomics Cache button with appropriate icon
+    assert 'st.button("Refresh Tokenomics Cache", icon=":material/refresh:", use_container_width=True)' in content
+    assert "Refresh BigQuery Cache" not in content
+
+    # 3. Project scope must not contain Dataset or Cloud ID
+    assert 'Cloud ID:' not in content
+    assert 'Dataset:' not in content
+
+    # 4. Argolis Account renamed to Cloud Account
+    assert 'Argolis Account:' not in content
+    assert 'Cloud Account:' in content
+    assert 'Cloud Project:' in content
+
+    # 5. Your Antigravity Token Analytics renamed to My Antigravity Token Analytics
+    assert 'My Antigravity<br/>Token Analytics' in content
+    assert 'My Antigravity Token Analytics' in content
+    assert 'Your Antigravity' not in content
+
