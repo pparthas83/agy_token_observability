@@ -313,14 +313,14 @@ st.markdown(
 )
 
 # ==========================================
-# GCP CONTEXT RESOLUTION (DYNAMIC & DE-IDENTIFIED)
+# GCP CONTEXT & ARGOLIS LDAP RESOLUTION (DYNAMIC & DE-IDENTIFIED)
 # ==========================================
 import urllib.request
 import google.auth
 
 
 def get_active_gcp_context():
-    """Dynamically resolves GCP project ID and numeric project ID without hardcoded values."""
+    """Dynamically resolves GCP project ID, Argolis account, and LDAP login without hardcoded values."""
     # 1. Project ID
     project_id = os.environ.get("GCP_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
     if not project_id:
@@ -330,24 +330,58 @@ def get_active_gcp_context():
                 project_id = detected
         except Exception:
             pass
+    active_project = project_id or "default-project"
+    dataset_id = os.environ.get("BQ_DATASET", "token_analytics")
 
-    # 2. Cloud Numeric ID
-    cloud_id = os.environ.get("CLOUD_ID") or os.environ.get("CLOUD_PROJECT_NUMBER")
-    if not cloud_id:
+    # 2. Argolis LDAP & Account Resolution
+    ldap = os.environ.get("ARGOLIS_LDAP") or os.environ.get("CLOUD_ID")
+    account = os.environ.get("ARGOLIS_ACCOUNT") or os.environ.get("USER_EMAIL")
+
+    if not ldap or not account:
         try:
-            req = urllib.request.Request(
-                "http://metadata.google.internal/computeMetadata/v1/project/numeric-project-id",
-                headers={"Metadata-Flavor": "Google"}
-            )
-            with urllib.request.urlopen(req, timeout=1.0) as resp:
-                cloud_id = resp.read().decode("utf-8").strip()
+            client = bigquery.Client(project=active_project)
+            query = f"SELECT user_email FROM `{active_project}.{dataset_id}.antigravity_token_events` WHERE user_email IS NOT NULL GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 1"
+            rows = list(client.query(query).result())
+            if rows and rows[0].user_email:
+                account = str(rows[0].user_email).strip()
         except Exception:
             pass
 
-    return project_id or "default-project", cloud_id or "gcp-cloud-project"
+    if not account:
+        try:
+            import subprocess
+            res = subprocess.run(["gcloud", "config", "get-value", "account"], capture_output=True, text=True, timeout=1.5)
+            if res.returncode == 0 and res.stdout.strip():
+                account = res.stdout.strip()
+        except Exception:
+            pass
+
+    if not ldap and account:
+        if "altostrat.com" in account:
+            parts = account.split("@")
+            if len(parts) > 1:
+                ldap = parts[1].split(".")[0]
+        elif "@" in account:
+            ldap = account.split("@")[0]
+        else:
+            ldap = account
+
+    if not ldap:
+        try:
+            import getpass
+            u = getpass.getuser()
+            if u and u != "root":
+                ldap = u
+        except Exception:
+            pass
+
+    ldap = ldap or "argolis-user"
+    account = account or f"{ldap}@altostrat.com"
+
+    return active_project, ldap, account
 
 
-GCP_PROJECT, CLOUD_ID = get_active_gcp_context()
+GCP_PROJECT, CLOUD_ID, ARGOLIS_ACCOUNT = get_active_gcp_context()
 DATASET_ID = os.environ.get("BQ_DATASET", "token_analytics")
 
 
@@ -457,7 +491,11 @@ with st.sidebar:
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: baseline;">
                     <span style="color: #5F6368; font-size: 11px;">Cloud ID:</span>
-                    <span style="font-weight: 500; color: #202124; font-family: 'Roboto Mono', monospace; font-size: 12px;">{CLOUD_ID}</span>
+                    <span style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace; font-size: 12px;" title="Argolis Account: {ARGOLIS_ACCOUNT}">{CLOUD_ID}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <span style="color: #5F6368; font-size: 11px;">Argolis Account:</span>
+                    <span style="font-weight: 500; color: #5F6368; font-family: 'Roboto Mono', monospace; font-size: 10px; max-width: 125px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{ARGOLIS_ACCOUNT}">{ARGOLIS_ACCOUNT}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px; padding-top: 4px; border-top: 1px dashed #E8EAED;">
                     <span style="color: #70757A; font-size: 10px;">Dataset:</span>
