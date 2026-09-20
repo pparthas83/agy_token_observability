@@ -62,14 +62,26 @@ def test_cache_savings_calculation():
     assert round(dollars_saved, 2) == 5.61
 
 
-def test_fmt_tok_short():
-    def _fmt_tok_short(n: int) -> str:
-        if n >= 1_000_000:
-            return f"{n/1_000_000.0:.2f}M"
-        elif n >= 1_000:
-            return f"{n/1000.0:.1f}k"
-        return f"{int(n):,}"
+def fmt_tok(n):
+    """Format token counts compactly (e.g., 1.25M, 45.2k, or 520)."""
+    if n is None:
+        return "0"
+    try:
+        n = float(n)
+    except (ValueError, TypeError):
+        return str(n)
+    if n >= 1_000_000:
+        return f"{n/1_000_000.0:.2f}M"
+    elif n >= 1_000:
+        return f"{n/1000.0:.1f}k"
+    return f"{int(n):,}"
 
-    assert _fmt_tok_short(64_417_519) == "64.42M"
-    assert _fmt_tok_short(102_069) == "102.1k"
-    assert _fmt_tok_short(672) == "672"
+
+def test_fmt_tok():
+    assert fmt_tok(64_417_519) == "64.42M"
+    assert fmt_tok(102_069) == "102.1k"
+    assert fmt_tok(672) == "672"
+    assert fmt_tok(0) == "0"
+    assert fmt_tok(None) == "0"
+    assert fmt_tok(1_500_000.0) == "1.50M"
+    assert fmt_tok(50_000) == "50.0k"

@@ -1,5 +1,4 @@
 import base64
-import datetime
 import json
 import os
 import sys
@@ -472,7 +471,6 @@ st.markdown(
 # ==========================================
 # GCP CONTEXT & ARGOLIS LDAP RESOLUTION (DYNAMIC & DE-IDENTIFIED)
 # ==========================================
-import urllib.request
 import google.auth
 
 
@@ -553,6 +551,21 @@ def run_query(query: str) -> pd.DataFrame:
         labels={"datacloud": "antigravity", "app": "token-dashboard"}
     )
     return client.query(query, job_config=job_config).to_dataframe()
+
+
+def fmt_tok(n):
+    """Format token counts compactly (e.g., 1.25M, 45.2k, or 520)."""
+    if n is None:
+        return "0"
+    try:
+        n = float(n)
+    except (ValueError, TypeError):
+        return str(n)
+    if n >= 1_000_000:
+        return f"{n/1_000_000.0:.2f}M"
+    elif n >= 1_000:
+        return f"{n/1000.0:.1f}k"
+    return f"{int(n):,}"
 
 
 # ==========================================
