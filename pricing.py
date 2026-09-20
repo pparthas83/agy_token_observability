@@ -27,9 +27,9 @@ def get_model_rates(model_name: str) -> Tuple[float, float]:
         return RATE_CARDS["default"]
 
     model_lower = model_name.lower()
-    for key, rates in RATE_CARDS.items():
-        if key in model_lower:
-            return rates
+    for key in sorted(RATE_CARDS.keys(), key=len, reverse=True):
+        if key != "default" and key in model_lower:
+            return RATE_CARDS[key]
 
     return RATE_CARDS["default"]
 
