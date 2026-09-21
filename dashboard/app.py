@@ -848,7 +848,7 @@ def show_github_setup_modal():
             """
 - **Python**: Python 3.11+ (with [`uv`](https://github.com/astral-sh/uv) recommended or standard `pip`)
 - **Google Cloud SDK**: [`gcloud`](https://cloud.google.com/sdk/docs/install) CLI installed and authenticated
-- **GCP Project**: Active project with BigQuery enabled (`pradeep-demo-1`)
+- **GCP Project**: Active project with BigQuery enabled (`YOUR_PROJECT_ID`)
             """
         )
 
@@ -870,7 +870,7 @@ pip install -r requirements.txt""",
         st.markdown("Authenticate using Application Default Credentials (ADC) to enable BigQuery streaming:")
         st.code(
             """gcloud auth application-default login
-gcloud config set project pradeep-demo-1""",
+gcloud config set project YOUR_PROJECT_ID""",
             language="bash",
         )
 
@@ -932,7 +932,7 @@ Deploy the dashboard container directly to Google Cloud Run for an enterprise-re
             """CLOUDSDK_METRICS_ENVIRONMENT=datacloud.antigravity gcloud run deploy antigravity-token-dashboard \\
   --source dashboard \\
   --region us-central1 \\
-  --project pradeep-demo-1 \\
+  --project YOUR_PROJECT_ID \\
   --allow-unauthenticated""",
             language="bash",
         )
@@ -943,12 +943,12 @@ Deploy the dashboard container directly to Google Cloud Run for an enterprise-re
         )
         st.code(
             """# Grant BigQuery Data Viewer and Job User roles
-gcloud projects add-iam-policy-binding pradeep-demo-1 \\
-  --member="serviceAccount:832497031659-compute@developer.gserviceaccount.com" \\
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \\
+  --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" \\
   --role="roles/bigquery.dataViewer"
 
-gcloud projects add-iam-policy-binding pradeep-demo-1 \\
-  --member="serviceAccount:832497031659-compute@developer.gserviceaccount.com" \\
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \\
+  --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" \\
   --role="roles/bigquery.jobUser" """,
             language="bash",
         )
@@ -976,7 +976,7 @@ gcloud projects add-iam-policy-binding pradeep-demo-1 \\
                   v
 +-----------------+------------------+
 | Google BigQuery Data Lakehouse     |
-| - pradeep-demo-1                   |
+| - YOUR_PROJECT_ID                  |
 | - antigravity_tokenomics           |
 |   .antigravity_token_events        |
 | - Partitioned & Clustered by Date  |
@@ -1074,25 +1074,25 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
 
-    # 4. Attribution & Creator Badge (Option 2: Compact Dual-Badge Footer)
+    # 4. Attribution & Creator Badge
     st.html(
         """
         <div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #DADCE0;">
-            <div style="background: #F8F9FA; border: 1px solid #DADCE0; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;" title="Engineered by Pradeep Sarathy (pradeepsarathy@google.com) with Google Antigravity & Gemini">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="#5F6368">
+            <div style="background: #F8F9FA; border: 1px solid #DADCE0; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;" title="Concept &amp; Ideation by pradeepsarathy@google.com • Build by Antigravity and Gemini">
+                <div style="display: flex; align-items: flex-start; gap: 8px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="#5F6368" style="margin-top: 2px; flex-shrink: 0;">
                         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                     </svg>
-                    <div style="font-size: 11px; font-weight: 500; color: #202124; font-family: 'Roboto Mono', monospace;">
-                        pradeepsarathy@google.com
+                    <div style="font-size: 11px; color: #5F6368; font-family: 'Google Sans', sans-serif; line-height: 1.35;">
+                        Concept &amp; Ideation by <span style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace; font-size: 11px;">pradeepsarathy@google.com</span>
                     </div>
                 </div>
                 <div style="border-top: 1px solid #E8EAED; padding-top: 6px; display: flex; align-items: center; gap: 8px;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="#1A73E8">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="#1A73E8" style="flex-shrink: 0;">
                         <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/>
                     </svg>
-                    <div style="font-size: 10.5px; color: #5F6368; font-family: 'Google Sans', sans-serif; line-height: 1.3;">
-                        Built with <strong>Google Antigravity</strong> & <strong>Gemini</strong>
+                    <div style="font-size: 11px; color: #5F6368; font-family: 'Google Sans', sans-serif; line-height: 1.35;">
+                        Build by <strong style="color: #202124; font-weight: 600;">Antigravity</strong> and <strong style="color: #202124; font-weight: 600;">Gemini</strong>
                     </div>
                 </div>
             </div>

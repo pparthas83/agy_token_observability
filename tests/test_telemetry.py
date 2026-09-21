@@ -215,19 +215,25 @@ def test_github_setup_modal():
     assert "☁️ Cloud Run Deployment" in app_content
     assert "🏗️ Architecture & Schema" in app_content
 
+    # 5. Generic placeholders (no personal project IDs in the modal)
+    assert "YOUR_PROJECT_ID" in app_content
+    # Ensure personal project ID is not in the modal code
+    modal_code = app_content[app_content.find("def show_github_setup_modal():") : app_content.find("with st.sidebar:")]
+    assert "pradeep-demo-1" not in modal_code
+    assert "832497031659" not in modal_code
+
 
 def test_sidebar_attribution_footer():
     """Verify left navigation sidebar attribution footer contains LDAP and technology credits."""
     with open("dashboard/app.py", "r", encoding="utf-8") as f:
         app_content = f.read()
 
-    # 1. Author LDAP attribution
+    # 1. Author LDAP & Concept / Ideation attribution
+    assert "Concept &amp; Ideation by" in app_content
     assert "pradeepsarathy@google.com" in app_content
 
-    # 2. Tech attribution (Antigravity and Gemini)
-    assert "Google Antigravity" in app_content
-    assert "Gemini" in app_content
-    assert "Built with <strong>Google Antigravity</strong> & <strong>Gemini</strong>" in app_content
+    # 2. Build attribution (Antigravity and Gemini)
+    assert "Build by <strong style=\"color: #202124; font-weight: 600;\">Antigravity</strong> and <strong style=\"color: #202124; font-weight: 600;\">Gemini</strong>" in app_content
 
 
 
