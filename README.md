@@ -9,6 +9,51 @@ Production-grade token observability, latency tracking, and LLM cost estimation 
 
 ---
 
+## 💡 Ever Wondered What Your Recent Prototype Actually Cost to Build on Antigravity?
+
+> *"Did that 50-turn debugging session cost \$0.12 or \$12.00? How much context caching discount are your agents achieving? Where is your model latency actually being spent?"*
+
+When pairing with autonomous AI coding agents like Google Antigravity, token consumption compounds rapidly across architecture planning, subagent delegation, automated file edits, and multi-turn reasoning loops.
+
+**Antigravity Token Observability** gives engineering leads, product managers, and developers complete, turn-by-turn transparency into their AI spend, cache efficiency, and inference latency—without modifying a single line of your application code:
+
+| View | Focus Area | Key FinOps & Engineering Insights |
+| :--- | :--- | :--- |
+| **Executive Overview** | Macro spend & fleet metrics | Multi-project daily spend rollup, tokens processed across repositories, top models, and unit economics (\$ / repository). |
+| **Tokenomics Deep Dive** | Turn-level context anatomy | Prompt vs. Output vs. Reasoning/Thinking breakdown, 75%+ prompt cache hit rates, cumulative cost savings, and context window bloat tracking. |
+| **Token Telemetry** | Execution latency waterfall | Sequential Gantt waterfall tracing Client Prep, TTFT Server Prefill, Thinking / Reasoning, and Output Streaming per turn. |
+
+---
+
+### 📊 Executive Overview
+*Fleet-wide investment tracking, multi-repository spend distribution, and macro token composition.*
+
+![Executive Overview](docs/images/executive_overview.png)
+
+---
+
+### 🔬 Tokenomics Deep Dive & Cost Trajectory
+*Turn-by-turn context progression, prompt cache hit absorption, and cumulative financial cost trajectories with real-time savings.*
+
+![Tokenomics Deep Dive](docs/images/tokenomics_deep_dive.png)
+
+<details>
+<summary><b>📈 View Financial Cost Trajectory & Cache Savings Chart</b></summary>
+<br>
+
+![Financial Cost Trajectory & Cache Savings](docs/images/financial_cost_trajectory.png)
+
+</details>
+
+---
+
+### ⚡ Token Telemetry & Latency Waterfall
+*Granular per-turn Gantt waterfalls isolating Time-to-First-Token (TTFT), client preparation, thinking reasoning, and token generation speed.*
+
+![Token Telemetry](docs/images/token_telemetry.png)
+
+---
+
 ## ⚡ 1-Click Automated Setup (Recommended)
 
 Run the self-service installer in your workstation terminal to bootstrap an isolated virtual environment, register the Antigravity `Stop` lifecycle hook, and auto-provision the BigQuery dataset, partitioned & clustered table, and analytical views in your Google Cloud account:
