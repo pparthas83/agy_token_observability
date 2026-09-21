@@ -1134,7 +1134,7 @@ try:
         st.html(
             """
             <div style="text-align: right; font-size: 11.5px; color: #5F6368; font-family: 'Google Sans', sans-serif; line-height: 1.35;">
-                Want to see your Antigravity metrics? Click the button below
+                Want to see your Antigravity metrics? Click this button
             </div>
             """
         )

@@ -208,7 +208,7 @@ def test_github_setup_modal():
 
     # 3. Breadcrumb row trigger button and prompt verbiage
     assert 'st.button("GitHub & Setup Guide", icon=":material/code:", use_container_width=True)' in app_content
-    assert "Want to see your Antigravity metrics? Click the button below" in app_content
+    assert "Want to see your Antigravity metrics? Click this button" in app_content
 
     # 4. Step-by-step setup tabs
     assert "🚀 Quick Start" in app_content
