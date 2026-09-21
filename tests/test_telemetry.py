@@ -229,16 +229,45 @@ def test_github_setup_modal():
 
 
 def test_sidebar_attribution_footer():
-    """Verify left navigation sidebar attribution footer contains LDAP and technology credits."""
+    """Verify left navigation sidebar attribution footer contains LDAP, full name, and technology credits."""
     with open("dashboard/app.py", "r", encoding="utf-8") as f:
         app_content = f.read()
 
-    # 1. Author LDAP & Concept / Ideation attribution
+    # 1. Author Name, LDAP & Concept / Ideation attribution
     assert "Concept &amp; Ideation by" in app_content
+    assert "Pradeep Parthasarathy" in app_content
     assert "pradeepsarathy@google.com" in app_content
 
     # 2. Build attribution (Antigravity and Gemini)
     assert "Build by <strong style=\"color: #202124; font-weight: 600;\">Antigravity</strong> and <strong style=\"color: #202124; font-weight: 600;\">Gemini</strong>" in app_content
+
+
+def test_repository_attribution_assets():
+    """Verify LICENSE, CITATION.cff, and README.md attribution assets exist with Pradeep Parthasarathy."""
+    import os
+
+    # 1. Check LICENSE
+    assert os.path.exists("LICENSE")
+    with open("LICENSE", "r", encoding="utf-8") as f:
+        license_text = f.read()
+    assert "Apache License" in license_text
+    assert "Copyright 2026 Pradeep Parthasarathy (pradeepsarathy@google.com)" in license_text
+
+    # 2. Check CITATION.cff
+    assert os.path.exists("CITATION.cff")
+    with open("CITATION.cff", "r", encoding="utf-8") as f:
+        cff_text = f.read()
+  
+    assert "family-names: \"Parthasarathy\"" in cff_text
+    assert "given-names: \"Pradeep\"" in cff_text
+    assert "email: \"pradeepsarathy@google.com\"" in cff_text
+
+    # 3. Check README.md
+    with open("README.md", "r", encoding="utf-8") as f:
+        readme_text = f.read()
+    assert "Pradeep Parthasarathy" in readme_text
+    assert "pradeepsarathy@google.com" in readme_text
+    assert "Apache_2.0" in readme_text
 
 
 

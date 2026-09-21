@@ -1086,13 +1086,13 @@ with st.sidebar:
     st.html(
         """
         <div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #DADCE0;">
-            <div style="background: #F8F9FA; border: 1px solid #DADCE0; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;" title="Concept &amp; Ideation by pradeepsarathy@google.com • Build by Antigravity and Gemini">
+            <div style="background: #F8F9FA; border: 1px solid #DADCE0; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;" title="Concept &amp; Ideation by Pradeep Parthasarathy (pradeepsarathy@google.com) • Build by Antigravity and Gemini">
                 <div style="display: flex; align-items: flex-start; gap: 8px;">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="#5F6368" style="margin-top: 2px; flex-shrink: 0;">
                         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                     </svg>
                     <div style="font-size: 11px; color: #5F6368; font-family: 'Google Sans', sans-serif; line-height: 1.35;">
-                        Concept &amp; Ideation by <span style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace; font-size: 11px;">pradeepsarathy@google.com</span>
+                        Concept &amp; Ideation by <span style="font-weight: 600; color: #202124;">Pradeep Parthasarathy</span> <span style="color: #5F6368; font-family: 'Roboto Mono', monospace; font-size: 10.5px;">(pradeepsarathy@google.com)</span>
                     </div>
                 </div>
                 <div style="border-top: 1px solid #E8EAED; padding-top: 6px; display: flex; align-items: center; gap: 8px;">

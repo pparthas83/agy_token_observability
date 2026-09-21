@@ -1,5 +1,10 @@
 # Antigravity Token Observability & FinOps Telemetry Engine
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Author](https://img.shields.io/badge/Author-Pradeep%20Parthasarathy-orange.svg)](mailto:pradeepsarathy@google.com)
+[![Engine](https://img.shields.io/badge/Built%20With-Antigravity%20%26%20Gemini-4285F4.svg)](#7-author--attribution)
+[![Platform](https://img.shields.io/badge/Platform-Google%20Cloud-34A853.svg)](https://cloud.google.com)
+
 Production-grade token observability, latency tracking, and LLM cost estimation pipeline for Google Antigravity 2.0 and Antigravity IDE, streaming real-time telemetry to Google BigQuery and Looker Studio.
 
 ---
@@ -130,3 +135,24 @@ A containerized, self-updating Streamlit dashboard can be deployed to Google Clo
   - `v_daily_project_spend`: Daily aggregates by project and model for Looker Studio executive reporting.
 
 For full schema definitions and ER diagrams, see [DATA_MODEL.md](DATA_MODEL.md).
+
+---
+
+## 7. Author & Attribution
+
+| Role | Contributor / Tool | Contact |
+| :--- | :--- | :--- |
+| **Concept & Ideation** | **Pradeep Parthasarathy** | [`pradeepsarathy@google.com`](mailto:pradeepsarathy@google.com) |
+| **Autonomous Build** | **Google Antigravity & Gemini** | [Antigravity Documentation](https://antigravity.google) |
+
+### Support & Feedback
+If you are deploying this telemetry engine in your team or finding it valuable for your Antigravity FinOps observability:
+- **⭐ Star this repository** to bookmark and track updates.
+- Reach out to **Pradeep Parthasarathy (`pradeepsarathy@google.com`)** for ideas, feedback, or custom metrics collaborations!
+
+---
+
+## 8. License & Citation
+
+- **License**: Distributed under the [Apache 2.0 License](LICENSE). Copyright © 2026 Pradeep Parthasarathy.
+- **Citation**: If you reference or build upon this work, please see the GitHub citation widget or reference [`CITATION.cff`](CITATION.cff).

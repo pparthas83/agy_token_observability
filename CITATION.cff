@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use, fork, or adapt this software, please cite it as below."
+title: "Antigravity Token Observability & FinOps Telemetry Engine"
+abstract: "Production-grade token observability, latency tracking, and LLM cost estimation pipeline for Google Antigravity 2.0 and Antigravity IDE, streaming real-time telemetry to Google BigQuery and Looker Studio."
+authors:
+  - family-names: "Parthasarathy"
+    given-names: "Pradeep"
+    email: "pradeepsarathy@google.com"
+date-released: 2026-09-21
+version: 1.0.0
+repository-code: "https://github.com/pparthas83/agy_token_observability"
+license: Apache-2.0
+keywords:
+  - "google-antigravity"
+  - "token-observability"
+  - "finops"
+  - "bigquery"
+  - "gemini"
+  - "llm-observability"
