@@ -206,8 +206,9 @@ def test_github_setup_modal():
     assert "pparthas83 / agy_token_observability" in app_content
     assert "https://github.com/pparthas83/agy_token_observability" in app_content
 
-    # 3. Breadcrumb row trigger button
+    # 3. Breadcrumb row trigger button and prompt verbiage
     assert 'st.button("GitHub & Setup Guide", icon=":material/code:", use_container_width=True)' in app_content
+    assert "Want to see your Antigravity metrics? Click the button below" in app_content
 
     # 4. Step-by-step setup tabs
     assert "🚀 Quick Start" in app_content
@@ -221,6 +222,10 @@ def test_github_setup_modal():
     modal_code = app_content[app_content.find("def show_github_setup_modal():") : app_content.find("with st.sidebar:")]
     assert "pradeep-demo-1" not in modal_code
     assert "832497031659" not in modal_code
+
+    # 6. Note callout section under View on GitHub box
+    assert "Please follow these steps to get a similar dashboard up and running for your own personal antigravity instance" in modal_code
+    assert "border-left: 4px solid #1A73E8" in modal_code
 
 
 def test_sidebar_attribution_footer():
