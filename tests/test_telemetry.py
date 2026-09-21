@@ -175,3 +175,20 @@ def test_light_theme_lock_and_plotly_legends():
     assert 'div[data-baseweb="popover"]' in app_content
     assert 'background-color: #FFFFFF !important;' in app_content
 
+
+def test_gantt_chart_yaxis_styling():
+    """Verify Gantt chart (fig_waterfall) y-axis labels have adequate margin, automargin, and consistent styling."""
+    with open("dashboard/app.py", "r", encoding="utf-8") as f:
+        app_content = f.read()
+
+    # 1. Left margin must be at least 80px to prevent clipping
+    assert "margin=dict(l=80, r=20, t=30, b=30)" in app_content
+
+    # 2. automargin=True must be enabled to dynamically adjust to multi-digit turn numbers
+    assert "automargin=True" in app_content
+
+    # 3. yaxis styling must use consistent charcoal color (#3C4043) and Roboto Mono
+    assert 'tickfont=dict(family="Roboto Mono, monospace", size=11, color="#3C4043")' in app_content
+    assert 'ticks="outside"' in app_content
+    assert 'linecolor="#DADCE0"' in app_content
+

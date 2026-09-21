@@ -1942,19 +1942,28 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
         fig_waterfall.update_layout(
             barmode="stack",
             height=waterfall_height,
-            margin=dict(l=10, r=20, t=30, b=30),
+            margin=dict(l=80, r=20, t=30, b=30),
             paper_bgcolor="#FFFFFF",
             plot_bgcolor="#FFFFFF",
-            font=dict(family="'Google Sans', 'Roboto', sans-serif", size=12, color="#202124"),
+            font=dict(family="Roboto, sans-serif", size=12, color="#202124"),
             xaxis=dict(
                 title=dict(text="Turn Execution Duration (Seconds)", font=dict(size=12, color="#5F6368")),
                 gridcolor="#F1F3F4",
+                linecolor="#DADCE0",
+                showline=True,
                 zeroline=False,
+                tickfont=dict(size=11, color="#5F6368"),
             ),
             yaxis=dict(
                 autorange="reversed",  # Sequential waterfall flowing top to bottom
+                automargin=True,
+                showline=True,
+                linecolor="#DADCE0",
                 gridcolor="#F8F9FA",
-                tickfont=dict(family="'Roboto Mono', monospace", size=11, color="#1A73E8"),
+                tickfont=dict(family="Roboto Mono, monospace", size=11, color="#3C4043"),
+                ticks="outside",
+                ticklen=4,
+                tickcolor="#DADCE0",
             ),
             legend=dict(
                 orientation="h",
