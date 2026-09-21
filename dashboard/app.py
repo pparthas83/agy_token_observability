@@ -187,6 +187,62 @@ st.markdown(
         color: #174EA6 !important;
     }
 
+    /* ======================================================== */
+    /* GOOGLE CLOUD CONSOLE SELECTBOX & DROPDOWN ENFORCEMENT    */
+    /* ======================================================== */
+    div[data-testid="stSelectbox"] {
+        background-color: transparent !important;
+    }
+    div[data-testid="stSelectbox"] label p {
+        color: #5F6368 !important;
+        font-family: 'Google Sans', sans-serif !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+    }
+    div[data-baseweb="select"] {
+        background-color: #FFFFFF !important;
+        border-radius: 4px !important;
+    }
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        border: 1px solid #DADCE0 !important;
+        border-radius: 4px !important;
+        color: #202124 !important;
+        min-height: 38px !important;
+    }
+    div[data-baseweb="select"] > div:hover {
+        border-color: #1A73E8 !important;
+    }
+    div[data-baseweb="select"] * {
+        color: #202124 !important;
+        font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }
+    div[data-baseweb="select"] svg {
+        fill: #5F6368 !important;
+    }
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] > div,
+    ul[role="listbox"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #DADCE0 !important;
+        box-shadow: 0 4px 12px rgba(60,64,67,0.15) !important;
+    }
+    li[role="option"] {
+        background-color: #FFFFFF !important;
+        color: #202124 !important;
+    }
+    li[role="option"]:hover,
+    li[role="option"][aria-selected="true"] {
+        background-color: #E8F0FE !important;
+        color: #1A73E8 !important;
+    }
+    li[role="option"] * {
+        color: #202124 !important;
+    }
+    li[role="option"][aria-selected="true"] * {
+        color: #1A73E8 !important;
+    }
+
     /* Sleek Cards */
     /* Base GCP Card */
     .gcp-card {
@@ -1010,7 +1066,7 @@ try:
                         y=-0.22,
                         xanchor="center",
                         x=0.5,
-                        font=dict(size=11, family="Roboto"),
+                        font=dict(size=11, family="Roboto", color="#3C4043"),
                     ),
                     plot_bgcolor="#FFFFFF",
                     paper_bgcolor="#FFFFFF",
@@ -1028,7 +1084,7 @@ try:
                     ),
                 )
                 fig_spend.update_traces(marker=dict(line=dict(width=0)))
-                st.plotly_chart(fig_spend, use_container_width=True)
+                st.plotly_chart(fig_spend, use_container_width=True, theme=None)
 
         with chart_col2:
             st.html(
@@ -1071,7 +1127,7 @@ try:
                     y=-0.22,
                     xanchor="center",
                     x=0.5,
-                    font=dict(size=11, family="Roboto"),
+                    font=dict(size=11, family="Roboto", color="#3C4043"),
                 ),
                 plot_bgcolor="#FFFFFF",
                 paper_bgcolor="#FFFFFF",
@@ -1086,7 +1142,7 @@ try:
                 ],
             )
             fig_pie.update_traces(textposition="none", marker=dict(line=dict(color="#FFFFFF", width=2)))
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, use_container_width=True, theme=None)
 
         st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
@@ -1458,9 +1514,10 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             y=1.02,
                             xanchor="right",
                             x=1,
+                            font=dict(size=11, color="#3C4043"),
                         ),
                     )
-                    st.plotly_chart(fig_prog, use_container_width=True)
+                    st.plotly_chart(fig_prog, use_container_width=True, theme=None)
                 st.html("</div>")
 
                 # --- VISUALIZATIONS ROW 2: DONUT SPLIT & CUMULATIVE COST TRAJECTORY ---
@@ -1532,7 +1589,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             itemdoubleclick=False,
                         ),
                     )
-                    st.plotly_chart(fig_pie, use_container_width=True)
+                    st.plotly_chart(fig_pie, use_container_width=True, theme=None)
                     st.html("</div>")
 
                 with c_right:
@@ -1602,9 +1659,9 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                                 tickprefix="$",
                                 tickformat=".2f"
                             ),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11, color="#3C4043")),
                         )
-                        st.plotly_chart(fig_cost, use_container_width=True)
+                        st.plotly_chart(fig_cost, use_container_width=True, theme=None)
                     st.html("</div>")
 
                 st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
@@ -1909,7 +1966,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
             ),
         )
 
-        st.plotly_chart(fig_waterfall, use_container_width=True)
+        st.plotly_chart(fig_waterfall, use_container_width=True, theme=None)
 
         # 5. Interactive Turn Selector for Context Inspector
         st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)

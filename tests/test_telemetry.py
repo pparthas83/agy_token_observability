@@ -1,7 +1,5 @@
 """Unit tests for Token Telemetry phase breakdowns, context extraction, and metrics."""
 
-import json
-import pytest
 from context_extractor import (
     generate_fallback_context,
     extract_turn_context_metadata,
@@ -149,4 +147,31 @@ def test_sidebar_navigation_elements():
     assert 'My Antigravity<br/>Token Analytics' in content
     assert 'My Antigravity Token Analytics' in content
     assert 'Your Antigravity' not in content
+
+
+def test_light_theme_lock_and_plotly_legends():
+    """Verify permanent light theme configuration, dropdown styling, and Plotly legend visibility."""
+    import os
+
+    # 1. Verify .streamlit/config.toml exists and locks base to light
+    assert os.path.exists("dashboard/.streamlit/config.toml")
+    with open("dashboard/.streamlit/config.toml", "r", encoding="utf-8") as f:
+        config_content = f.read()
+    assert 'base = "light"' in config_content
+    assert 'primaryColor = "#1A73E8"' in config_content
+
+    # 2. Verify dashboard/app.py enforces theme=None on plotly charts
+    with open("dashboard/app.py", "r", encoding="utf-8") as f:
+        app_content = f.read()
+
+    assert 'st.plotly_chart(fig_spend, use_container_width=True, theme=None)' in app_content
+    assert 'st.plotly_chart(fig_pie, use_container_width=True, theme=None)' in app_content
+    assert 'st.plotly_chart(fig_prog, use_container_width=True, theme=None)' in app_content
+    assert 'st.plotly_chart(fig_cost, use_container_width=True, theme=None)' in app_content
+    assert 'st.plotly_chart(fig_waterfall, use_container_width=True, theme=None)' in app_content
+
+    # 3. Verify CSS rules enforce Google Cloud light theme on selectboxes and popovers
+    assert 'div[data-baseweb="select"]' in app_content
+    assert 'div[data-baseweb="popover"]' in app_content
+    assert 'background-color: #FFFFFF !important;' in app_content
 
