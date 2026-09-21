@@ -2,23 +2,33 @@
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Author](https://img.shields.io/badge/Author-Pradeep%20Parthasarathy-orange.svg)](mailto:pradeepsarathy@google.com)
-[![Engine](https://img.shields.io/badge/Built%20With-Antigravity%20%26%20Gemini-4285F4.svg)](#7-author--attribution)
+[![Engine](https://img.shields.io/badge/Built%20With-Antigravity%20%26%20Gemini-4285F4.svg)](#8-author--attribution)
 [![Platform](https://img.shields.io/badge/Platform-Google%20Cloud-34A853.svg)](https://cloud.google.com)
-[![Total Installs](https://komarev.com/ghpvc/?username=pparthas83&repo=agy_token_observability_installs&label=Total+Installs&color=blue)](https://github.com/pparthas83/agy_token_observability)
 
-Production-grade token observability, latency tracking, and LLM cost estimation pipeline for Google Antigravity 2.0 and Antigravity IDE, streaming real-time telemetry to Google BigQuery and Looker Studio.
+Production-grade token observability, latency tracking, and LLM cost estimation pipeline for Google Antigravity 2.0 and Antigravity IDE, streaming real-time telemetry to Google BigQuery and an enterprise Cloud Run dashboard.
 
 ---
 
 ## ⚡ 1-Click Automated Setup (Recommended)
 
-Run the automated installer to set up isolated virtual environments, register the Antigravity `Stop` lifecycle hook, and provision the BigQuery dataset, day-partitioned table, and analytical views in your Google Cloud account:
+Run the self-service installer in your workstation terminal to bootstrap an isolated virtual environment, register the Antigravity `Stop` lifecycle hook, and auto-provision the BigQuery dataset, partitioned & clustered table, and analytical views in your Google Cloud account:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/pparthas83/agy_token_observability/main/install.sh | bash
 ```
 
-*To uninstall cleanly at any time:*
+### Custom Configuration Options
+You can pass custom parameters directly to the installer:
+```bash
+# Specify target GCP Project or custom BigQuery dataset
+curl -sSL https://raw.githubusercontent.com/pparthas83/agy_token_observability/main/install.sh | bash -s -- --project=MY_GCP_PROJECT --dataset=token_analytics
+
+# Non-interactive installation (for automated scripts or devcontainers)
+curl -sSL https://raw.githubusercontent.com/pparthas83/agy_token_observability/main/install.sh | bash -s -- --project=MY_GCP_PROJECT --non-interactive
+```
+
+### Clean 1-Line Uninstall
+To completely remove the telemetry client and unregister lifecycle hooks at any time:
 ```bash
 ~/.antigravity-observability/uninstall.sh
 ```
@@ -28,24 +38,32 @@ curl -sSL https://raw.githubusercontent.com/pparthas83/agy_token_observability/m
 ## 1. Architectural Highlights
 
 - **Security & Privacy First**:
-  - **Zero Plaintext Secrets**: Uses Google Application Default Credentials (`google.auth.default()`). No service account keys or API tokens are stored on workstations.
-  - **Data Minimization (GDPR & Compliance Safe)**: Extracts **strictly** numeric token counts (`prompt_tokens`, `output_tokens`, `thinking_tokens`, `content_tokens`), model strings, latencies, timestamps, and workspace names. Prompts, user queries, code files, and model responses are **never** captured or transmitted.
-  - **Non-Interference Guarantee**: Operates completely asynchronously during agent completion (`Stop` lifecycle hook). SQLite databases are accessed strictly in read-only mode (`?mode=ro`), preventing file locks against Antigravity runtime. If BigQuery is offline, execution fails silently and logs locally to `~/.gemini/antigravity/log/token_streamer.log` without degrading IDE performance.
+  - **Zero Plaintext Secrets**: Uses Google Application Default Credentials (`google.auth.default()`). No service account keys or API tokens are stored on developer workstations.
+  - **Data Minimization (GDPR & Compliance Safe)**: Extracts **strictly** numeric token counts (`prompt_tokens`, `output_tokens`, `cached_tokens`, `thinking_tokens`), model strings, latencies, timestamps, and workspace metadata. Prompts, code files, and model responses are **never** captured or transmitted.
+  - **Non-Interference Guarantee**: Operates asynchronously at turn completion (`Stop` hook). SQLite databases are read strictly in read-only mode (`?mode=ro`). If BigQuery or the network is unavailable, execution fails silently and logs locally to `~/.gemini/antigravity/log/token_streamer.log` without degrading IDE performance.
+- **Zero-Latency Non-Blocking Execution**:
+  - Standard output strictly outputs `{}` with exit code 0 to adhere to Antigravity's IDE hook contract, ensuring zero perceived developer lag.
+  - **Schema Verification Caching**: Caches BigQuery schema validation state in `~/.gemini/antigravity/.token_sync_state.json` (`_schema_verified_*`), eliminating redundant GCP API roundtrips on successive agent turns.
 - **Idempotency & Deduplication**:
   - Every event has a deterministic `event_id` (`{conversation_id}_{step_index}`).
-  - BigQuery streaming API inserts use server-side `row_ids` deduplication.
-  - Atomic cursor tracking (`~/.gemini/antigravity/.token_sync_state.json`) prevents duplicate writes during crashes.
+  - BigQuery streaming API inserts enforce server-side `row_ids` deduplication.
+  - Atomic cursor tracking prevents duplicate writes during crashes or restarts.
 - **Automated Metadata Enrichment**:
   - Decodes Antigravity's internal protobuf index (`agyhub_summaries_proto.pb`) to map conversation UUIDs to human-friendly project names and git repositories automatically.
+- **Resource Attribution**:
+  - All Google Cloud operations are annotated with FinOps attribution (`datacloud: antigravity`).
 
 ---
 
 ## 2. Quick Start on Local Workstation
 
 ### Prerequisites
-- Python 3.10+ (or `uv`)
-- `gcloud auth application-default login`
-- Access to your GCP Project with BigQuery Data Editor permissions on dataset `token_analytics`.
+- Python 3.10+ (or [`uv`](https://github.com/astral-sh/uv))
+- Google Cloud SDK (`gcloud` CLI) authenticated via:
+  ```bash
+  gcloud auth application-default login
+  ```
+- Access to your target GCP Project with BigQuery Data Editor permissions on dataset `token_analytics`.
 
 ### Installation
 ```bash
@@ -61,6 +79,9 @@ chmod +x run_hook.sh
 
 ### Manual CLI Usage
 ```bash
+# Auto-provision BigQuery dataset, table, and analytical views
+.venv/bin/python3 stream_to_bq.py --init-schema
+
 # Dry-run test of active conversation (auto-detects project from gcloud ADC or GCP_PROJECT env)
 .venv/bin/python3 stream_to_bq.py --dry-run
 
@@ -120,22 +141,26 @@ RUN git clone https://github.com/pparthas83/agy_token_observability.git /etc/ant
 
 ## 5. Live Cloud Run FinOps Dashboard
 
-A containerized, self-updating Streamlit dashboard can be deployed to Google Cloud Run:
+A containerized, self-updating dashboard deployed to Google Cloud Run:
+- **Live Endpoint**: [https://antigravity-token-dashboard-832497031659.us-central1.run.app](https://antigravity-token-dashboard-832497031659.us-central1.run.app)
 - **Deployment Command**:
   ```bash
-  gcloud run deploy antigravity-token-dashboard \
+  CLOUDSDK_METRICS_ENVIRONMENT=datacloud.antigravity gcloud run deploy antigravity-token-dashboard \
       --source=dashboard \
       --region=us-central1 \
       --allow-unauthenticated \
       --labels=datacloud=antigravity,app=token-dashboard
   ```
-- **Service Name**: `antigravity-token-dashboard`
-- **Region**: `us-central1`
-- **Features**:
-  - Real-time spend counters & token metrics across all developer workstations.
-  - Interactive charts for daily spend, token trajectory, and project attribution.
-  - Conversation context-window bloat analysis.
-  - Real-time event feed querying BigQuery dataset `token_analytics`.
+
+### Dashboard Views
+1. **Executive Overview**: Spend KPIs, 30-day daily spend trends, top model distribution, and cumulative cache savings.
+2. **Tokenomics Deep Dive**: Model-level token consumption breakdown (Prompt, Output, Cached, Thinking), token velocity, and context efficiency.
+3. **Token Telemetry**:
+   - Turn-by-turn Gantt latency waterfall.
+   - **Token Consumption vs. Turn**: Area chart with unclipped `Tokens Consumed` metrics.
+   - **Financial Cost Trajectory & Cache Savings**: Continuous trajectory showing Gross vs. Net USD spend with **paper-anchored** `First Turn (#N)` and `Current Turn (#N)` endpoint labels.
+   - Expandable turn inspector with raw JSON metadata and status badges.
+4. **Interactive Setup Modal**: In-app 1-click self-service commands, architecture diagrams, and uninstall guidance.
 
 ---
 

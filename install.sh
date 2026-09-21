@@ -338,9 +338,6 @@ echo -e "  - Init/Fix schema: ${CYAN}${INSTALL_DIR}/.venv/bin/python3 ${INSTALL_
 echo -e "  - Uninstall:       ${CYAN}${INSTALL_DIR}/uninstall.sh${NC}"
 echo ""
 
-# Anonymous install metric ping (non-blocking, 2s timeout)
-curl -fsS --max-time 2 "https://komarev.com/ghpvc/?username=pparthas83&repo=agy_token_observability_installs&label=Installs" >/dev/null 2>&1 || true
-
 echo -e "${BOLD}⭐ Antigravity Token Observability${NC}"
 echo -e "   Concept & Ideation: ${BOLD}Pradeep Parthasarathy${NC} (pradeepsarathy@google.com)"
 echo -e "   Build: Antigravity & Gemini"

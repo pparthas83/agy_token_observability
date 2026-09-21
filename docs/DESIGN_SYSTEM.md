@@ -159,7 +159,7 @@ To eliminate label clipping, overlaps, and responsive layout breakage, all Plotl
 
 ### 4. Global Architecture & Setup Modal (`show_github_setup_modal`)
 - `@st.dialog` modal with 4 tabs:
-  1. `⚡ 1-Click Self-Service (Recommended)`: Copy-paste curl installer with live install counter badge.
+  1. `⚡ 1-Click Self-Service (Recommended)`: Copy-paste curl installer.
   2. `📋 Architecture & Data Flow`: Multi-agent telemetry pipeline diagram.
   3. `🔧 Manual Deployment`: Step-by-step BigQuery DDL and Cloud Run commands.
   4. `🗑️ Clean Uninstall`: 1-line uninstall command.
