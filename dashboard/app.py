@@ -1339,7 +1339,7 @@ try:
                 )
                 fig_spend.update_layout(
                     height=320,
-                    margin=dict(l=10, r=10, t=10, b=10),
+                    margin=dict(l=60, r=10, t=10, b=10),
                     legend=dict(
                         orientation="h",
                         yanchor="top",
@@ -1356,6 +1356,7 @@ try:
                         tickfont=dict(size=11, color="#5F6368"),
                     ),
                     yaxis=dict(
+                        automargin=True,
                         showgrid=True,
                         gridcolor="#F1F3F4",
                         linecolor="#DADCE0",
@@ -1771,7 +1772,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                     fig_prog.update_layout(
                         barmode="stack",
                         height=360,
-                        margin=dict(l=20, r=20, t=10, b=50),
+                        margin=dict(l=75, r=20, t=10, b=50),
                         paper_bgcolor="#FFFFFF",
                         plot_bgcolor="#FFFFFF",
                         bargap=0.25,
@@ -1783,10 +1784,16 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             tickfont=dict(family="Roboto Mono, monospace", size=11, color="#3C4043"),
                         ),
                         yaxis=dict(
+                            automargin=True,
                             showgrid=True,
                             gridcolor="#F1F3F4",
                             linecolor="#DADCE0",
-                            title="Tokens Consumed",
+                            title=dict(
+                                text="Tokens Consumed",
+                                standoff=14,
+                                font=dict(family="Google Sans, sans-serif", size=12, color="#3C4043"),
+                            ),
+                            tickfont=dict(family="Roboto Mono, monospace", size=11, color="#3C4043"),
                         ),
                         legend=dict(
                             orientation="h",
@@ -1919,7 +1926,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
 
                         fig_cost.update_layout(
                             height=320,
-                            margin=dict(l=20, r=60, t=10, b=40),
+                            margin=dict(l=75, r=40, t=10, b=40),
                             paper_bgcolor="#FFFFFF",
                             plot_bgcolor="#FFFFFF",
                             font=dict(family="Roboto, sans-serif", size=12, color="#5F6368"),
@@ -1932,12 +1939,18 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                                 tickfont=dict(size=11, family="Google Sans, sans-serif", color="#3C4043"),
                             ),
                             yaxis=dict(
+                                automargin=True,
                                 showgrid=True,
                                 gridcolor="#F1F3F4",
                                 linecolor="#DADCE0",
-                                title="Cumulative USD ($)",
+                                title=dict(
+                                    text="Cumulative USD ($)",
+                                    standoff=14,
+                                    font=dict(family="Google Sans, sans-serif", size=12, color="#3C4043"),
+                                ),
                                 tickprefix="$",
-                                tickformat=".2f"
+                                tickformat=".2f",
+                                tickfont=dict(family="Roboto Mono, monospace", size=11, color="#3C4043"),
                             ),
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11, color="#3C4043")),
                         )

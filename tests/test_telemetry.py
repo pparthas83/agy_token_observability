@@ -193,6 +193,21 @@ def test_gantt_chart_yaxis_styling():
     assert 'linecolor="#DADCE0"' in app_content
 
 
+def test_token_and_cost_chart_yaxis_styling():
+    """Verify Token Consumption vs Turn and Cumulative USD vs Turn charts have adequate left margins, automargin, and title standoff."""
+    with open("dashboard/app.py", "r", encoding="utf-8") as f:
+        app_content = f.read()
+
+    # 1. Left margin for Token Consumption must be >= 75px and automargin=True
+    assert "margin=dict(l=75, r=20, t=10, b=50)" in app_content
+    assert 'text="Tokens Consumed"' in app_content
+    assert "standoff=14" in app_content
+
+    # 2. Left margin for Cumulative USD chart must be >= 75px and automargin=True
+    assert "margin=dict(l=75, r=40, t=10, b=40)" in app_content
+    assert 'text="Cumulative USD ($)"' in app_content
+
+
 def test_github_setup_modal():
     """Verify GitHub repository link and setup guide modal exist and are configured correctly."""
     with open("dashboard/app.py", "r", encoding="utf-8") as f:
