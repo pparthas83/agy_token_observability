@@ -175,8 +175,6 @@ A containerized, self-updating dashboard deployed to Google Cloud Run:
   - `v_conversation_rollup`: Conversation session duration, token volume, max context window bloat, and session cost.
   - `v_daily_project_spend`: Daily aggregates by project and model for Looker Studio executive reporting.
 
-For full schema definitions and ER diagrams, see [DATA_MODEL.md](DATA_MODEL.md).
-
 ---
 
 ## 7. Design System & UI Anti-Regression Framework
