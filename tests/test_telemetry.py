@@ -216,3 +216,18 @@ def test_github_setup_modal():
     assert "🏗️ Architecture & Schema" in app_content
 
 
+def test_sidebar_attribution_footer():
+    """Verify left navigation sidebar attribution footer contains LDAP and technology credits."""
+    with open("dashboard/app.py", "r", encoding="utf-8") as f:
+        app_content = f.read()
+
+    # 1. Author LDAP attribution
+    assert "pradeepsarathy@google.com" in app_content
+
+    # 2. Tech attribution (Antigravity and Gemini)
+    assert "Google Antigravity" in app_content
+    assert "Gemini" in app_content
+    assert "Built with <strong>Google Antigravity</strong> & <strong>Gemini</strong>" in app_content
+
+
+
