@@ -1926,17 +1926,20 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
 
                         fig_cost.update_layout(
                             height=320,
-                            margin=dict(l=75, r=40, t=10, b=40),
+                            margin=dict(l=75, r=25, t=10, b=45),
                             paper_bgcolor="#FFFFFF",
                             plot_bgcolor="#FFFFFF",
                             font=dict(family="Roboto, sans-serif", size=12, color="#5F6368"),
                             xaxis=dict(
                                 showgrid=False,
+                                showticklabels=False,
                                 linecolor="#DADCE0",
+                                ticks="outside",
+                                ticklen=4,
+                                tickcolor="#DADCE0",
+                                tickmode="array",
                                 tickvals=[first_turn_no, curr_turn_no],
-                                ticktext=[f"First Turn (#{first_turn_no})", f"Current Turn (#{curr_turn_no})"],
-                                tickangle=0,
-                                tickfont=dict(size=11, family="Google Sans, sans-serif", color="#3C4043"),
+                                zeroline=False,
                             ),
                             yaxis=dict(
                                 automargin=True,
@@ -1953,6 +1956,30 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                                 tickfont=dict(family="Roboto Mono, monospace", size=11, color="#3C4043"),
                             ),
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11, color="#3C4043")),
+                            annotations=[
+                                dict(
+                                    xref="paper",
+                                    yref="paper",
+                                    x=0.0,
+                                    y=-0.08,
+                                    xanchor="left",
+                                    yanchor="top",
+                                    text=f"First Turn (#{first_turn_no})",
+                                    showarrow=False,
+                                    font=dict(size=11, family="Google Sans, sans-serif", color="#3C4043"),
+                                ),
+                                dict(
+                                    xref="paper",
+                                    yref="paper",
+                                    x=1.0,
+                                    y=-0.08,
+                                    xanchor="right",
+                                    yanchor="top",
+                                    text=f"Current Turn (#{curr_turn_no})",
+                                    showarrow=False,
+                                    font=dict(size=11, family="Google Sans, sans-serif", color="#3C4043"),
+                                ),
+                            ],
                         )
                         st.plotly_chart(fig_cost, use_container_width=True, theme=None)
                     st.html("</div>")

@@ -154,7 +154,22 @@ For full schema definitions and ER diagrams, see [DATA_MODEL.md](DATA_MODEL.md).
 
 ---
 
-## 7. Author & Attribution
+## 7. Design System & UI Anti-Regression Framework
+
+The dashboard is built upon an enterprise **Google Cloud Console Design System** to deliver high data density, zero visual clipping, and responsive aesthetics.
+
+- **Design System Documentation**: See [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) for full layout rules, Google color hex tokens, typography hierarchy, card specs, and Plotly chart geometry.
+- **Theme Engine**: Centralized in [`dashboard/theme.py`](dashboard/theme.py) for single-source-of-truth styling across all charts and UI components.
+- **Anti-Regression Verification**:
+  To ensure that no visual regressions (e.g. truncated axis labels, missing automargins, unpadded containers) are introduced during development, run:
+  ```bash
+  ./scripts/verify_ui_standards.sh
+  ```
+  This script executes Python compilation checks, the dedicated 10-point UI styling regression suite ([`tests/test_styling_regression.py`](tests/test_styling_regression.py)), and the complete telemetry test suite before commit or deployment.
+
+---
+
+## 8. Author & Attribution
 
 | Role | Contributor / Tool | Contact |
 | :--- | :--- | :--- |
@@ -168,7 +183,7 @@ If you are deploying this telemetry engine in your team or finding it valuable f
 
 ---
 
-## 8. License & Citation
+## 9. License & Citation
 
 - **License**: Distributed under the [Apache 2.0 License](LICENSE). Copyright © 2026 Pradeep Parthasarathy.
 - **Citation**: If you reference or build upon this work, please see the GitHub citation widget or reference [`CITATION.cff`](CITATION.cff).

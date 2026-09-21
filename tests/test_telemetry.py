@@ -203,9 +203,13 @@ def test_token_and_cost_chart_yaxis_styling():
     assert 'text="Tokens Consumed"' in app_content
     assert "standoff=14" in app_content
 
-    # 2. Left margin for Cumulative USD chart must be >= 75px and automargin=True
-    assert "margin=dict(l=75, r=40, t=10, b=40)" in app_content
+    # 2. Left margin for Cumulative USD chart must be >= 75px, automargin=True, and paper-anchored annotations
+    assert "margin=dict(l=75, r=25, t=10, b=45)" in app_content
     assert 'text="Cumulative USD ($)"' in app_content
+    assert 'text=f"First Turn (#{first_turn_no})"' in app_content
+    assert 'text=f"Current Turn (#{curr_turn_no})"' in app_content
+    assert 'xref="paper"' in app_content
+    assert 'xanchor="right"' in app_content
 
 
 def test_github_setup_modal():
