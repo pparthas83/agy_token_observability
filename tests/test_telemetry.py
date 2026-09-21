@@ -192,3 +192,27 @@ def test_gantt_chart_yaxis_styling():
     assert 'ticks="outside"' in app_content
     assert 'linecolor="#DADCE0"' in app_content
 
+
+def test_github_setup_modal():
+    """Verify GitHub repository link and setup guide modal exist and are configured correctly."""
+    with open("dashboard/app.py", "r", encoding="utf-8") as f:
+        app_content = f.read()
+
+    # 1. Dialog decorator and modal function
+    assert '@st.dialog("Antigravity Token Observability — Architecture & Setup Guide", width="large")' in app_content
+    assert "def show_github_setup_modal():" in app_content
+
+    # 2. GitHub repository links and branding
+    assert "pparthas83 / agy_token_observability" in app_content
+    assert "https://github.com/pparthas83/agy_token_observability" in app_content
+
+    # 3. Breadcrumb row trigger button
+    assert 'st.button("GitHub & Setup Guide", icon=":material/code:", use_container_width=True)' in app_content
+
+    # 4. Step-by-step setup tabs
+    assert "🚀 Quick Start" in app_content
+    assert "⚡ Automated Hook Sync" in app_content
+    assert "☁️ Cloud Run Deployment" in app_content
+    assert "🏗️ Architecture & Schema" in app_content
+
+

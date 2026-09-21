@@ -812,6 +812,213 @@ def load_telemetry_for_conversation(conversation_id: str):
 
 
 # ==========================================
+# GITHUB & SETUP GUIDE MODAL DIALOG
+# ==========================================
+@st.dialog("Antigravity Token Observability — Architecture & Setup Guide", width="large")
+def show_github_setup_modal():
+    """Modal dialog displaying repository links, architecture, and step-by-step setup guide."""
+    st.html(
+        """
+        <div style="display: flex; align-items: center; justify-content: space-between; background: #F8F9FA; border: 1px solid #DADCE0; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <svg height="28" width="28" viewBox="0 0 16 16" fill="#202124">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                <div>
+                    <div style="font-weight: 700; font-size: 14px; color: #202124; font-family: 'Google Sans', sans-serif;">pparthas83 / agy_token_observability</div>
+                    <div style="font-size: 11px; color: #5F6368; font-family: 'Roboto', sans-serif;">Production Token Telemetry & FinOps for Google Antigravity</div>
+                </div>
+            </div>
+            <a href="https://github.com/pparthas83/agy_token_observability" target="_blank" style="text-decoration: none;">
+                <button style="display: flex; align-items: center; gap: 6px; background: #1A73E8; color: #FFFFFF; border: none; border-radius: 4px; padding: 7px 16px; font-size: 12px; font-weight: 500; font-family: 'Google Sans', sans-serif; cursor: pointer; box-shadow: 0 1px 2px rgba(60,64,67,0.15);">
+                    View on GitHub ↗
+                </button>
+            </a>
+        </div>
+        """
+    )
+
+    tab_quickstart, tab_hook, tab_deploy, tab_arch = st.tabs(
+        ["🚀 Quick Start", "⚡ Automated Hook Sync", "☁️ Cloud Run Deployment", "🏗️ Architecture & Schema"]
+    )
+
+    with tab_quickstart:
+        st.markdown("### 1. Prerequisites")
+        st.markdown(
+            """
+- **Python**: Python 3.11+ (with [`uv`](https://github.com/astral-sh/uv) recommended or standard `pip`)
+- **Google Cloud SDK**: [`gcloud`](https://cloud.google.com/sdk/docs/install) CLI installed and authenticated
+- **GCP Project**: Active project with BigQuery enabled (`pradeep-demo-1`)
+            """
+        )
+
+        st.markdown("### 2. Clone Repository & Setup Environment")
+        st.code(
+            """git clone https://github.com/pparthas83/agy_token_observability.git
+cd agy_token_observability
+
+# Install dependencies using uv (fastest)
+uv sync
+
+# Or using standard pip
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt""",
+            language="bash",
+        )
+
+        st.markdown("### 3. Authenticate with Google Cloud ADC")
+        st.markdown("Authenticate using Application Default Credentials (ADC) to enable BigQuery streaming:")
+        st.code(
+            """gcloud auth application-default login
+gcloud config set project pradeep-demo-1""",
+            language="bash",
+        )
+
+        st.markdown("### 4. Execute the Ingestion Pipeline")
+        st.markdown(
+            "Extracts conversation events and token usage from workstation storage (`~/.gemini/antigravity/`), computes exact tokenomics & cache pricing, and streams records into BigQuery:"
+        )
+        st.code(
+            """uv run python stream_to_bq.py""",
+            language="bash",
+        )
+
+        st.markdown("### 5. Launch Observability Dashboard Locally")
+        st.code(
+            """cd dashboard
+uv run streamlit run app.py""",
+            language="bash",
+        )
+
+    with tab_hook:
+        st.markdown("### Real-Time Continuous Ingestion Hook")
+        st.markdown(
+            """
+To automatically ingest telemetry after every Antigravity coding turn or session without manual execution, configure an Antigravity lifecycle hook or workstation background trigger.
+            """
+        )
+        st.markdown("#### Option A: Antigravity Session Hook")
+        st.markdown(
+            "Add a session-end hook to `~/.gemini/config/hooks.json` to stream telemetry immediately upon session exit:"
+        )
+        st.code(
+            """{
+  "hooks": {
+    "after_session": {
+      "command": "uv run python /path/to/agy_token_observability/stream_to_bq.py",
+      "timeout_seconds": 30
+    }
+  }
+}""",
+            language="json",
+        )
+
+        st.markdown("#### Option B: Background Cron / Systemd Timer")
+        st.markdown("For periodic background sync every 15 minutes:")
+        st.code(
+            """*/15 * * * * cd /path/to/agy_token_observability && uv run python stream_to_bq.py >> /tmp/agy_sync.log 2>&1""",
+            language="bash",
+        )
+
+    with tab_deploy:
+        st.markdown("### Deploy to Google Cloud Run")
+        st.markdown(
+            """
+Deploy the dashboard container directly to Google Cloud Run for an enterprise-ready, serverless observability portal with automatic autoscaling.
+            """
+        )
+        st.markdown("#### 1. Single-Command Cloud Run Deployment")
+        st.code(
+            """CLOUDSDK_METRICS_ENVIRONMENT=datacloud.antigravity gcloud run deploy antigravity-token-dashboard \\
+  --source dashboard \\
+  --region us-central1 \\
+  --project pradeep-demo-1 \\
+  --allow-unauthenticated""",
+            language="bash",
+        )
+
+        st.markdown("#### 2. IAM & Service Account Configuration")
+        st.markdown(
+            "Ensure the Cloud Run default compute service account has BigQuery read and job creation privileges:"
+        )
+        st.code(
+            """# Grant BigQuery Data Viewer and Job User roles
+gcloud projects add-iam-policy-binding pradeep-demo-1 \\
+  --member="serviceAccount:832497031659-compute@developer.gserviceaccount.com" \\
+  --role="roles/bigquery.dataViewer"
+
+gcloud projects add-iam-policy-binding pradeep-demo-1 \\
+  --member="serviceAccount:832497031659-compute@developer.gserviceaccount.com" \\
+  --role="roles/bigquery.jobUser" """,
+            language="bash",
+        )
+
+    with tab_arch:
+        st.markdown("### 3-Tier Enterprise Token Observability Pipeline")
+        st.markdown(
+            """
+```
++------------------------------------+
+| Workstation Antigravity Execution  |
+| - ~/.gemini/antigravity/           |
+| - conversations.db (SQLite)        |
+| - Step Transcripts & Tool Telemetry|
++-----------------+------------------+
+                  |
+                  v
++-----------------+------------------+
+| Streaming & FinOps Ingestion Engine|
+| - stream_to_bq.py                  |
+| - pricing.py (Flash/Pro amortized) |
+| - Token Classification (Cache/Think|
++-----------------+------------------+
+                  |
+                  v
++-----------------+------------------+
+| Google BigQuery Data Lakehouse     |
+| - pradeep-demo-1                   |
+| - antigravity_tokenomics           |
+|   .antigravity_token_events        |
+| - Partitioned & Clustered by Date  |
++-----------------+------------------+
+                  |
+                  v
++-----------------+------------------+
+| Google Cloud Run Dashboard         |
+| - antigravity-token-dashboard      |
+| - Executive Overview (Spend KPIs)  |
+| - Tokenomics Deep Dive             |
+| - Gantt Sequential Telemetry       |
++------------------------------------+
+```
+            """
+        )
+
+        st.markdown("### Key BigQuery Columns (`antigravity_token_events`)")
+        st.markdown(
+            """
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `timestamp` | `TIMESTAMP` | UTC event execution timestamp (partition column) |
+| `conversation_id` | `STRING` | Antigravity session UUID |
+| `step_index` | `INT64` | Sequential execution turn index |
+| `antigravity_project_name` | `STRING` | Clean workspace codebase identifier |
+| `model` | `STRING` | Gemini model name (e.g., `gemini-2.5-flash`, `gemini-2.5-pro`) |
+| `total_prompt_tokens` | `INT64` | Total input context window tokens |
+| `cached_tokens` | `INT64` | Context cache hits (95% discounted input) |
+| `fresh_input_tokens` | `INT64` | Fresh non-cached input tokens |
+| `output_tokens` | `INT64` | Total generated tokens (thinking + content) |
+| `thinking_tokens` | `INT64` | Internal chain-of-thought reasoning tokens |
+| `content_tokens` | `INT64` | User-facing answer / code generation tokens |
+| `estimated_cost_usd` | `FLOAT64` | Exact blended API cost calculated via official pricing |
+| `cached_savings_usd` | `FLOAT64` | Net dollars saved by context caching |
+| `ttft_latency_ms` | `INT64` | Time-to-First-Token prefill latency |
+| `generation_duration_ms` | `INT64` | Output generation duration in milliseconds |
+            """
+        )
+
+
+# ==========================================
 # LEFT NAVIGATION PANEL
 # ==========================================
 with st.sidebar:
@@ -876,17 +1083,23 @@ try:
     df_daily = load_daily_spend()
     df_projects = load_project_portfolio()
 
-    # 4. Top Breadcrumb: My Antigravity Token Analytics -> Executive Overview
+    # 4. Top Breadcrumb & GitHub Setup Guide Trigger
     nav_title = selected_nav.replace("📊", "").replace("🔬", "").replace("⚡", "").strip()
-    st.html(
-        f"""
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid #DADCE0;">
-            <span style="font-size: 13px; color: #5F6368; font-family: 'Google Sans', sans-serif;">My Antigravity Token Analytics</span>
-            <span style="color: #DADCE0; font-size: 13px;">→</span>
-            <span style="font-size: 13px; font-weight: 600; color: #1A73E8; font-family: 'Google Sans', sans-serif;">{nav_title}</span>
-        </div>
-        """
-    )
+    col_bread, col_link = st.columns([3.8, 1.2], vertical_alignment="center")
+    with col_bread:
+        st.html(
+            f"""
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-family: 'Google Sans', sans-serif;">
+                <span style="color: #5F6368;">My Antigravity Token Analytics</span>
+                <span style="color: #DADCE0;">→</span>
+                <span style="font-weight: 600; color: #1A73E8;">{nav_title}</span>
+            </div>
+            """
+        )
+    with col_link:
+        if st.button("GitHub & Setup Guide", icon=":material/code:", use_container_width=True):
+            show_github_setup_modal()
+    st.html("<div style='border-bottom: 1px solid #DADCE0; margin-top: 4px; margin-bottom: 18px;'></div>")
 
     if "Executive Overview" in selected_nav:
         top_project = df_projects.iloc[0]["antigravity_project_name"]
