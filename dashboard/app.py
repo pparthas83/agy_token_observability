@@ -826,7 +826,7 @@ def show_github_setup_modal():
                 </svg>
                 <div>
                     <div style="font-weight: 700; font-size: 14px; color: #202124; font-family: 'Google Sans', sans-serif;">pparthas83 / agy_token_observability</div>
-                    <div style="font-size: 11px; color: #5F6368; font-family: 'Roboto', sans-serif;">Production Token Telemetry & FinOps for Google Antigravity</div>
+                    <div style="font-size: 11px; color: #5F6368; font-family: 'Roboto', sans-serif;">Concept &amp; Ideation: <strong>Pradeep Parthasarathy</strong> (pradeepsarathy@google.com) &bull; Build: Antigravity &amp; Gemini</div>
                 </div>
             </div>
             <a href="https://github.com/pparthas83/agy_token_observability" target="_blank" style="text-decoration: none;">
@@ -846,15 +846,57 @@ def show_github_setup_modal():
         """
     )
 
-    tab_quickstart, tab_hook, tab_deploy, tab_arch = st.tabs(
-        ["🚀 Quick Start", "⚡ Automated Hook Sync", "☁️ Cloud Run Deployment", "🏗️ Architecture & Schema"]
+    tab_selfservice, tab_manual, tab_deploy, tab_arch = st.tabs(
+        ["⚡ 1-Click Self-Service (Recommended)", "🛠️ Manual Setup", "☁️ Cloud Run Deployment", "🏗️ Architecture & Schema"]
     )
 
-    with tab_quickstart:
+    with tab_selfservice:
+        st.markdown("### ⚡ Zero-Touch Self-Service Setup")
+        st.markdown(
+            """
+Run this single command in your workstation terminal. It fully automates local environment setup, registers the Antigravity `Stop` lifecycle hook, and provisions the BigQuery fact table and views in **your own Google Cloud project**:
+            """
+        )
+        st.code(
+            """curl -sSL https://raw.githubusercontent.com/pparthas83/agy_token_observability/main/install.sh | bash""",
+            language="bash",
+        )
+
+        st.markdown("#### What This Single Command Does Automatically:")
+        st.markdown(
+            """
+1. **Detects Your Google Cloud Project**: Reads active `gcloud` project configuration and validates Application Default Credentials (`gcloud auth application-default login`).
+2. **Provisions BigQuery in Your Cloud Account**: Automatically creates the `token_analytics` dataset, the 26-column **DAY-partitioned & clustered** `antigravity_token_events` fact table, and two analytical views (`v_conversation_rollup`, `v_daily_project_spend`).
+3. **Bootstraps Isolated Telemetry Client**: Clones into `~/.antigravity-observability` and builds a hermetic Python virtual environment with fast `uv` or `pip`.
+4. **Registers Antigravity Lifecycle Hook**: Idempotently adds the `Stop` hook into `~/.gemini/config/hooks.json` so every coding turn streams telemetry automatically at session completion without slowing down your IDE.
+            """
+        )
+
+        st.markdown("#### Optional Command-Line Flags:")
+        st.code(
+            """# Specify custom GCP project or dataset
+curl -sSL https://raw.githubusercontent.com/pparthas83/agy_token_observability/main/install.sh | bash -s -- --project=MY_GCP_PROJECT --dataset=token_analytics""",
+            language="bash",
+        )
+
+        st.markdown("#### Useful Management Commands:")
+        st.code(
+            """# Test stream extraction with dry-run (no BigQuery write)
+~/.antigravity-observability/.venv/bin/python3 ~/.antigravity-observability/stream_to_bq.py --dry-run
+
+# Backfill all existing conversations on your machine into BigQuery
+~/.antigravity-observability/.venv/bin/python3 ~/.antigravity-observability/stream_to_bq.py --backfill
+
+# Clean uninstall at any time (removes hook and installation directory)
+~/.antigravity-observability/uninstall.sh""",
+            language="bash",
+        )
+
+    with tab_manual:
         st.markdown("### 1. Prerequisites")
         st.markdown(
             """
-- **Python**: Python 3.11+ (with [`uv`](https://github.com/astral-sh/uv) recommended or standard `pip`)
+- **Python**: Python 3.10+ (with [`uv`](https://github.com/astral-sh/uv) recommended or standard `pip`)
 - **Google Cloud SDK**: [`gcloud`](https://cloud.google.com/sdk/docs/install) CLI installed and authenticated
 - **GCP Project**: Active project with BigQuery enabled (`YOUR_PROJECT_ID`)
             """
@@ -874,57 +916,40 @@ pip install -r requirements.txt""",
             language="bash",
         )
 
-        st.markdown("### 3. Authenticate with Google Cloud ADC")
-        st.markdown("Authenticate using Application Default Credentials (ADC) to enable BigQuery streaming:")
+        st.markdown("### 3. Authenticate with Google Cloud ADC & Provision BigQuery")
         st.code(
             """gcloud auth application-default login
-gcloud config set project YOUR_PROJECT_ID""",
+gcloud config set project YOUR_PROJECT_ID
+
+# Initialize BigQuery dataset, partitioned table, and views
+uv run python stream_to_bq.py --init-schema""",
             language="bash",
         )
 
-        st.markdown("### 4. Execute the Ingestion Pipeline")
+        st.markdown("### 4. Register Antigravity Lifecycle Hook")
         st.markdown(
-            "Extracts conversation events and token usage from workstation storage (`~/.gemini/antigravity/`), computes exact tokenomics & cache pricing, and streams records into BigQuery:"
+            "Add the `Stop` hook to `~/.gemini/config/hooks.json` to stream telemetry at the end of each agent turn:"
         )
         st.code(
-            """uv run python stream_to_bq.py""",
-            language="bash",
+            """{
+  "token-observability": {
+    "enabled": true,
+    "Stop": [
+      {
+        "type": "command",
+        "command": "/path/to/agy_token_observability/run_hook.sh",
+        "timeout": 30
+      }
+    ]
+  }
+}""",
+            language="json",
         )
 
         st.markdown("### 5. Launch Observability Dashboard Locally")
         st.code(
             """cd dashboard
 uv run streamlit run app.py""",
-            language="bash",
-        )
-
-    with tab_hook:
-        st.markdown("### Real-Time Continuous Ingestion Hook")
-        st.markdown(
-            """
-To automatically ingest telemetry after every Antigravity coding turn or session without manual execution, configure an Antigravity lifecycle hook or workstation background trigger.
-            """
-        )
-        st.markdown("#### Option A: Antigravity Session Hook")
-        st.markdown(
-            "Add a session-end hook to `~/.gemini/config/hooks.json` to stream telemetry immediately upon session exit:"
-        )
-        st.code(
-            """{
-  "hooks": {
-    "after_session": {
-      "command": "uv run python /path/to/agy_token_observability/stream_to_bq.py",
-      "timeout_seconds": 30
-    }
-  }
-}""",
-            language="json",
-        )
-
-        st.markdown("#### Option B: Background Cron / Systemd Timer")
-        st.markdown("For periodic background sync every 15 minutes:")
-        st.code(
-            """*/15 * * * * cd /path/to/agy_token_observability && uv run python stream_to_bq.py >> /tmp/agy_sync.log 2>&1""",
             language="bash",
         )
 

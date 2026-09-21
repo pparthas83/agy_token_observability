@@ -71,3 +71,41 @@ def test_sync_state_save_and_load():
             # Reload and verify
             loaded = stream_to_bq.load_sync_state()
             assert loaded == test_state
+
+
+def test_ensure_bigquery_schema():
+    """Verify ensure_bigquery_schema creates dataset, table with partitioning/clustering, and views."""
+    from unittest.mock import MagicMock
+    mock_client = MagicMock()
+
+    success = stream_to_bq.ensure_bigquery_schema(
+        client=mock_client,
+        project_id="test-dev-project",
+        dataset_id="token_analytics",
+        table_id="antigravity_token_events",
+    )
+
+    assert success is True
+    # Verify dataset was created
+    mock_client.create_dataset.assert_called_once()
+    created_dataset = mock_client.create_dataset.call_args[0][0]
+    assert created_dataset.dataset_id == "token_analytics"
+    assert created_dataset.project == "test-dev-project"
+    assert created_dataset.location == "US"
+
+    # Verify table was created with Day partitioning and clustering
+    mock_client.create_table.assert_called_once()
+    created_table = mock_client.create_table.call_args[0][0]
+    assert created_table.table_id == "antigravity_token_events"
+    assert created_table.time_partitioning.type_ == "DAY"
+    assert created_table.time_partitioning.field == "timestamp"
+    assert "antigravity_project_name" in created_table.clustering_fields
+    assert "user_email" in created_table.clustering_fields
+    assert len(created_table.schema) == 26
+
+    # Verify analytical views were created
+    assert mock_client.query.call_count == 2
+    query_calls = [c[0][0] for c in mock_client.query.call_args_list]
+    assert any("v_conversation_rollup" in q for q in query_calls)
+    assert any("v_daily_project_spend" in q for q in query_calls)
+

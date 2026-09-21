@@ -4,8 +4,24 @@
 [![Author](https://img.shields.io/badge/Author-Pradeep%20Parthasarathy-orange.svg)](mailto:pradeepsarathy@google.com)
 [![Engine](https://img.shields.io/badge/Built%20With-Antigravity%20%26%20Gemini-4285F4.svg)](#7-author--attribution)
 [![Platform](https://img.shields.io/badge/Platform-Google%20Cloud-34A853.svg)](https://cloud.google.com)
+[![Total Installs](https://komarev.com/ghpvc/?username=pparthas83&repo=agy_token_observability_installs&label=Total+Installs&color=blue)](https://github.com/pparthas83/agy_token_observability)
 
 Production-grade token observability, latency tracking, and LLM cost estimation pipeline for Google Antigravity 2.0 and Antigravity IDE, streaming real-time telemetry to Google BigQuery and Looker Studio.
+
+---
+
+## ⚡ 1-Click Automated Setup (Recommended)
+
+Run the automated installer to set up isolated virtual environments, register the Antigravity `Stop` lifecycle hook, and provision the BigQuery dataset, day-partitioned table, and analytical views in your Google Cloud account:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/pparthas83/agy_token_observability/main/install.sh | bash
+```
+
+*To uninstall cleanly at any time:*
+```bash
+~/.antigravity-observability/uninstall.sh
+```
 
 ---
 

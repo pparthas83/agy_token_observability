@@ -211,8 +211,8 @@ def test_github_setup_modal():
     assert "Want to see your Antigravity metrics? Click this button" in app_content
 
     # 4. Step-by-step setup tabs
-    assert "🚀 Quick Start" in app_content
-    assert "⚡ Automated Hook Sync" in app_content
+    assert "⚡ 1-Click Self-Service" in app_content
+    assert "install.sh" in app_content
     assert "☁️ Cloud Run Deployment" in app_content
     assert "🏗️ Architecture & Schema" in app_content
 
@@ -268,6 +268,26 @@ def test_repository_attribution_assets():
     assert "Pradeep Parthasarathy" in readme_text
     assert "pradeepsarathy@google.com" in readme_text
     assert "Apache_2.0" in readme_text
+
+
+def test_self_service_scripts():
+    """Verify install.sh and uninstall.sh scripts exist and have executable permissions."""
+    import os
+
+    assert os.path.exists("install.sh")
+    assert os.access("install.sh", os.X_OK)
+    with open("install.sh", "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "Pradeep Parthasarathy" in content
+    assert "HOOKS_JSON" in content
+    assert "token-observability" in content
+
+    assert os.path.exists("uninstall.sh")
+    assert os.access("uninstall.sh", os.X_OK)
+    with open("uninstall.sh", "r", encoding="utf-8") as f:
+        u_content = f.read()
+    assert "Pradeep Parthasarathy" in u_content
+    assert "del data[\"token-observability\"]" in u_content
 
 
 
