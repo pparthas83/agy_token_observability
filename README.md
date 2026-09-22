@@ -187,7 +187,7 @@ RUN git clone https://github.com/pparthas83/agy_token_observability.git /etc/ant
 ## 5. Live Cloud Run FinOps Dashboard
 
 A containerized, self-updating dashboard deployed to Google Cloud Run:
-- **Live Endpoint**: [https://antigravity-token-dashboard-832497031659.us-central1.run.app](https://antigravity-token-dashboard-832497031659.us-central1.run.app)
+- **Live Endpoint**: [TBD]
 - **Deployment Command**:
   ```bash
   CLOUDSDK_METRICS_ENVIRONMENT=datacloud.antigravity gcloud run deploy antigravity-token-dashboard \
