@@ -21,6 +21,7 @@ except Exception:
 try:
     import pricing
     format_step_cost = pricing.format_step_cost
+    get_cache_savings_rate = pricing.get_cache_savings_rate
 except Exception:
     def format_step_cost(val):
         if val is None or val <= 0:
@@ -29,6 +30,9 @@ except Exception:
         tip = f"Exact: ${val:,.6f} USD"
         disp = f"${val:,.2f}" if val >= 0.01 else (f"${val:,.4f}" if val >= 0.0001 else f"${val:,.6f}")
         return disp, tip
+
+    def get_cache_savings_rate(model_name):
+        return 0.675
 
 
 # Resolve Antigravity Official Logo
@@ -1580,8 +1584,9 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 # Cache efficiency: % of prompt tokens that came from cache
                 cache_hit_rate = (tot_cached / tot_prompt * 100.0) if tot_prompt > 0 else 0.0
 
-                # Gemini prompt cache discount: $0.15/M -> $0.0375/M (savings = $0.1125/M)
-                dollars_saved = (tot_cached / 1_000_000.0) * 0.1125
+                # Gemini prompt cache discount (e.g. 3.8 Flash: $0.75/M -> $0.075/M, savings = $0.675/M)
+                savings_rate = get_cache_savings_rate(str(conv_row.get("model", "gemini-3.8-flash")))
+                dollars_saved = (tot_cached / 1_000_000.0) * savings_rate
 
                 # Peak context window reached (max prompt in any turn: cached + uncached prompt)
                 max_prompt_reached = int((df_turns["cached_tokens"] + df_turns["uncached_prompt_tokens"]).max()) if not df_turns.empty else 0
@@ -1906,8 +1911,13 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                     )
                     if not df_turns.empty:
                         df_cost = df_turns.copy()
-                        df_cost["cum_actual_cost"] = df_cost["cost_usd"].cumsum()
-                        df_cost["turn_saved"] = (df_cost["cached_tokens"] / 1_000_000.0) * 0.1125
+                        if "model" in df_cost.columns:
+                            df_cost["turn_saved"] = df_cost.apply(
+                                lambda row: (row["cached_tokens"] / 1_000_000.0) * get_cache_savings_rate(str(row.get("model", ""))),
+                                axis=1
+                            )
+                        else:
+                            df_cost["turn_saved"] = (df_cost["cached_tokens"] / 1_000_000.0) * 0.675
                         df_cost["cum_baseline_cost"] = df_cost["cum_actual_cost"] + df_cost["turn_saved"].cumsum()
 
                         first_turn_no = int(df_cost["step_index"].iloc[0])
@@ -2069,17 +2079,19 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                                     <div style="background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 6px; padding: 8px 12px;">
                                         <div style="font-weight: 600; color: #1A73E8; font-size: 11.5px; margin-bottom: 4px;">Official Rate Cards (per 1M Tokens)</div>
                                         <ul style="margin: 0; padding-left: 18px; font-size: 11px; color: #3C4043;">
-                                            <li><strong>Gemini 3.8 / 2.5 Flash</strong>: $0.15 prompt / $0.60 output</li>
+                                            <li><strong>Gemini 3.8 Flash</strong>: $0.75 prompt / $3.75 output (cached: $0.075)</li>
+                                            <li><strong>Gemini 2.5 Flash</strong>: $0.30 prompt / $2.50 output (cached: $0.030)</li>
+                                            <li><strong>Gemini 2.0 Flash</strong>: $0.15 prompt / $0.60 output (cached: $0.0375)</li>
                                             <li><strong>Gemini Flash-Lite</strong>: $0.075 prompt / $0.30 output</li>
-                                            <li><strong>Gemini 3.8 / 2.5 Pro</strong>: $1.25 prompt / $5.00 output</li>
+                                            <li><strong>Gemini 2.5 Pro</strong>: $1.25 prompt / $10.00 output (cached: $0.125)</li>
                                             <li><strong>Claude 3.7 Sonnet</strong>: $3.00 prompt / $15.00 output</li>
                                         </ul>
                                     </div>
                                     <div style="background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 6px; padding: 8px 12px;">
                                         <div style="font-weight: 600; color: #1E8E3E; font-size: 11.5px; margin-bottom: 4px;">Context Caching Economics &amp; Precision</div>
                                         <div style="font-size: 11px; color: #3C4043;">
-                                            &bull; <strong>Cache Hits</strong>: When previous turns are cached, only new uncached prompt tokens are billed, dropping cost to <strong>~$0.0004</strong>.<br>
-                                            &bull; <strong>Adaptive Precision</strong>: Costs &ge; $0.01 show 2 decimals ($0.05); sub-cent micro-costs show 4 decimals ($0.0004). Hover over any cell to see exact 6-decimal rate.
+                                            &bull; <strong>Cache Hits</strong>: Cached prefix tokens are discounted by 90% (Gemini 3.8/2.5) down to $0.075/M, dropping turn costs from ~$0.05 to ~$0.0022.<br>
+                                            &bull; <strong>Adaptive Precision</strong>: Costs &ge; $0.01 show 2 decimals ($0.05); sub-cent micro-costs show 4 decimals ($0.0022). Hover over any cell to see exact 6-decimal rate.
                                         </div>
                                     </div>
                                 </div>

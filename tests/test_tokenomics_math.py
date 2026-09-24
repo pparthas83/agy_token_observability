@@ -56,10 +56,10 @@ def test_cache_hit_rate_calculation():
 
 
 def test_cache_savings_calculation():
-    # Gemini prompt cache discount: $0.15/M -> $0.0375/M (savings = $0.1125/M)
+    # Gemini 3.8 Flash prompt cache discount: $0.75/M -> $0.075/M (savings = $0.675/M)
     tot_cached = 49_889_551
-    dollars_saved = (tot_cached / 1_000_000.0) * 0.1125
-    assert round(dollars_saved, 2) == 5.61
+    dollars_saved = (tot_cached / 1_000_000.0) * 0.675
+    assert round(dollars_saved, 2) == 33.68
 
 
 def fmt_tok(n):

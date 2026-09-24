@@ -4,20 +4,43 @@ from typing import Dict, Tuple
 
 # Rate card in USD per million tokens: (prompt_rate_per_m, output_rate_per_m)
 RATE_CARDS: Dict[str, Tuple[float, float]] = {
-    # Gemini Flash models
-    "gemini-3.8-flash": (0.15, 0.60),
-    "gemini-2.5-flash": (0.15, 0.60),
-    "flash": (0.15, 0.60),
+    # Gemini 3.8 Flash (Active introductory rate through Dec 31, 2026: $0.75 prompt, $3.75 output)
+    "gemini-3.8-flash": (0.75, 3.75),
+    "gemini-3.6-flash": (0.75, 3.75),
+    "gemini-3.5-flash": (0.75, 3.75),
+    # Gemini 2.5 Flash ($0.30 prompt, $2.50 output)
+    "gemini-2.5-flash": (0.30, 2.50),
+    # Gemini 2.0 Flash ($0.15 prompt, $0.60 output)
+    "gemini-2.0-flash": (0.15, 0.60),
+    "flash": (0.75, 3.75),
+    # Gemini Flash-Lite ($0.075 prompt, $0.30 output)
     "flash_lite": (0.075, 0.30),
     # Gemini Pro models
-    "gemini-3.8-pro": (1.25, 5.00),
-    "gemini-2.5-pro": (1.25, 5.00),
-    "pro": (1.25, 5.00),
+    "gemini-3.1-pro": (2.00, 12.00),
+    "gemini-2.5-pro": (1.25, 10.00),
+    "gemini-1.5-pro": (1.25, 5.00),
+    "pro": (1.25, 10.00),
     # Claude models (if routed via Vertex / Antigravity)
     "claude-3.7-sonnet": (3.00, 15.00),
     "claude-3.5-sonnet": (3.00, 15.00),
-    # Fallback / Default rate
-    "default": (0.15, 0.60),
+    # Fallback / Default rate (Gemini 3.8 Flash baseline)
+    "default": (0.75, 3.75),
+}
+
+# Context caching discount per 1M tokens: uncached_prompt_rate - cached_read_rate
+CACHE_SAVINGS_PER_M: Dict[str, float] = {
+    "gemini-3.8-flash": 0.675,   # $0.75 prompt - $0.075 cache read (90% discount)
+    "gemini-3.6-flash": 0.675,
+    "gemini-3.5-flash": 0.675,
+    "gemini-2.5-flash": 0.270,   # $0.30 prompt - $0.030 cache read (90% discount)
+    "gemini-2.0-flash": 0.1125,  # $0.15 prompt - $0.0375 cache read (75% discount)
+    "flash": 0.675,
+    "flash_lite": 0.05625,       # $0.075 prompt - $0.01875 cache read (75% discount)
+    "gemini-3.1-pro": 1.80,      # $2.00 prompt - $0.20 cache read (90% discount)
+    "gemini-2.5-pro": 1.125,     # $1.25 prompt - $0.125 cache read (90% discount)
+    "gemini-1.5-pro": 0.9375,    # $1.25 prompt - $0.3125 cache read (75% discount)
+    "pro": 1.125,
+    "default": 0.675,
 }
 
 
@@ -32,6 +55,19 @@ def get_model_rates(model_name: str) -> Tuple[float, float]:
             return RATE_CARDS[key]
 
     return RATE_CARDS["default"]
+
+
+def get_cache_savings_rate(model_name: str) -> float:
+    """Returns the USD savings per 1M cached tokens compared to full prompt price."""
+    if not model_name:
+        return CACHE_SAVINGS_PER_M["default"]
+
+    model_lower = model_name.lower()
+    for key in sorted(CACHE_SAVINGS_PER_M.keys(), key=len, reverse=True):
+        if key != "default" and key in model_lower:
+            return CACHE_SAVINGS_PER_M[key]
+
+    return CACHE_SAVINGS_PER_M["default"]
 
 
 def calculate_cost(prompt_tokens: int, output_tokens: int, model_name: str) -> float:

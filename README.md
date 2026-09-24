@@ -223,12 +223,15 @@ $$\text{Step Cost (USD)} = \left(\frac{\text{Prompt Tokens}}{1{,}000{,}000} \tim
 
 ### 🏷️ Model Rate Cards (per 1 Million Tokens)
 
-| Model Family | Identifiers | Prompt Rate (per 1M) | Output Rate (per 1M) |
-| :--- | :--- | :---: | :---: |
-| **Gemini Flash** | `gemini-3.8-flash`, `gemini-2.5-flash`, `flash` | **\$0.15** | **\$0.60** |
-| **Gemini Flash-Lite** | `flash_lite` | **\$0.075** | **\$0.30** |
-| **Gemini Pro** | `gemini-3.8-pro`, `gemini-2.5-pro`, `pro` | **\$1.25** | **\$5.00** |
-| **Claude Sonnet** *(if routed)* | `claude-3.7-sonnet`, `claude-3.5-sonnet` | **\$3.00** | **\$15.00** |
+| Model Family | Identifiers | Prompt Rate (per 1M) | Output Rate (per 1M) | Cached Read (per 1M) |
+| :--- | :--- | :---: | :---: | :---: |
+| **Gemini 3.8 Flash** *(Active Intro)* | `gemini-3.8-flash`, `gemini-3.6-flash`, `flash` | **\$0.75** | **\$3.75** | **\$0.075** |
+| **Gemini 2.5 Flash** | `gemini-2.5-flash` | **\$0.30** | **\$2.50** | **\$0.030** |
+| **Gemini 2.0 Flash** | `gemini-2.0-flash` | **\$0.15** | **\$0.60** | **\$0.0375** |
+| **Gemini Flash-Lite** | `flash_lite` | **\$0.075** | **\$0.30** | **\$0.01875** |
+| **Gemini 2.5 Pro** | `gemini-2.5-pro`, `pro` | **\$1.25** | **\$10.00** | **\$0.125** |
+| **Gemini 3.1 Pro Preview** | `gemini-3.1-pro` | **\$2.00** | **\$12.00** | **\$0.200** |
+| **Claude Sonnet** *(if routed)* | `claude-3.7-sonnet`, `claude-3.5-sonnet` | **\$3.00** | **\$15.00** | — |
 
 ### ⚡ Context Caching Economics
 
@@ -236,22 +239,22 @@ Antigravity aggressively leverages Gemini context caching for multi-turn session
 - **`prompt_tokens`**: Reflects the **uncached, billable prompt tokens** introduced in that specific turn.
 - **`cached_tokens`**: Reflects the **cached prefix tokens** reused from conversation history.
 
-#### Worked Examples:
+#### Worked Examples (Gemini 3.8 Flash Rate Card):
 1. **Cache Hit Turn (e.g. Turn #3719)**:
    * Prompt Tokens: `2,399` | Cached Tokens: `54,826` | Output Tokens: `101`
-   * $\text{Step Cost} = \left(\frac{2,399}{1{,}000{,}000} \times \$0.15\right) + \left(\frac{101}{1{,}000{,}000} \times \$0.60\right) = \mathbf{\$0.000420\text{ USD}}\; (\mathbf{\$0.0004})$
+   * $\text{Step Cost} = \left(\frac{2,399}{1{,}000{,}000} \times \$0.75\right) + \left(\frac{101}{1{,}000{,}000} \times \$3.75\right) = \mathbf{\$0.002178\text{ USD}}\; (\mathbf{\$0.0022})$
 2. **Cache Miss Turn (e.g. Turn #3731)**:
    * Prompt Tokens: `60,104` | Cached Tokens: `0` | Output Tokens: `107`
-   * $\text{Step Cost} = \left(\frac{60,104}{1{,}000{,}000} \times \$0.15\right) + \left(\frac{107}{1{,}000{,}000} \times \$0.60\right) = \mathbf{\$0.009080\text{ USD}}\; (\mathbf{\$0.0091})$
-   * *Context caching delivered an immediate **21.6x cost reduction** on the hit turn.*
+   * $\text{Step Cost} = \left(\frac{60,104}{1{,}000{,}000} \times \$0.75\right) + \left(\frac{107}{1{,}000{,}000} \times \$3.75\right) = \mathbf{\$0.045479\text{ USD}}\; (\mathbf{\$0.05})$
+   * *Context caching delivered an immediate **20.9x cost reduction** on the hit turn.*
 
 ### 🔍 Adaptive Precision Formatting
 
-To prevent micro-costs (such as $\$0.0004$) from misleadingly rounding to $\$0.00$ in UI tables while maintaining clean visual scanability:
+To prevent micro-costs (such as $\$0.0022$) from misleadingly rounding to $\$0.00$ in UI tables while maintaining clean visual scanability:
 - **$\ge \$0.01$**: Formatted with 2 decimal places (e.g. `\$0.05`, `\$1.25`).
-- **$\$0.0001 \le \text{cost} < \$0.01$**: Formatted with 4 decimal places (e.g. `\$0.0004`, `\$0.0091`).
+- **$\$0.0001 \le \text{cost} < \$0.01$**: Formatted with 4 decimal places (e.g. `\$0.0022`, `\$0.0091`).
 - **$< \$0.0001$**: Formatted with 6 decimal places (e.g. `\$0.000045`).
-- **Exact Fidelity**: Hovering over any table cell or dropdown in the dashboard displays the full 6-decimal rate via native browser tooltips (`Exact: $0.000432 USD`).
+- **Exact Fidelity**: Hovering over any table cell or dropdown in the dashboard displays the full 6-decimal rate via native browser tooltips (`Exact: $0.002178 USD`).
 
 ---
 

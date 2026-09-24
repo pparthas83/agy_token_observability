@@ -52,9 +52,9 @@ def test_build_bigquery_rows():
     assert r["cached_tokens"] == 800
     assert r["thinking_tokens"] == 50
     assert r["content_tokens"] == 450
-    # Cost for 1,000 prompt + 500 output @ Flash rates ($0.15/M, $0.60/M):
-    # 0.00015 + 0.00030 = 0.00045
-    assert float(r["estimated_cost_usd"]) == 0.00045
+    # Cost for 1,000 prompt + 500 output @ Gemini 3.8 Flash rates ($0.75/M, $3.75/M):
+    # 0.00075 + 0.001875 = 0.002625
+    assert float(r["estimated_cost_usd"]) == 0.002625
 
 
 def test_sync_state_save_and_load():
