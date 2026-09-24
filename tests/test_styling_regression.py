@@ -194,3 +194,14 @@ def test_runtime_plotly_figure_instantiation():
     assert len(fig.layout.annotations) == 2
     assert fig.layout.annotations[0].xanchor == "left"
     assert fig.layout.annotations[1].xanchor == "right"
+
+
+def test_financial_trajectory_data_pipeline_integrity(app_source: str):
+    """Ensure df_cost calculates cum_actual_cost before cum_baseline_cost."""
+    assert 'df_cost["cum_actual_cost"] = df_cost["cost_usd"].cumsum()' in app_source
+    actual_pos = app_source.find('df_cost["cum_actual_cost"] = df_cost["cost_usd"].cumsum()')
+    baseline_pos = app_source.find('df_cost["cum_baseline_cost"] = df_cost["cum_actual_cost"] + df_cost["turn_saved"].cumsum()')
+    assert actual_pos != -1, "cum_actual_cost must be calculated on df_cost"
+    assert baseline_pos != -1, "cum_baseline_cost must be calculated on df_cost"
+    assert actual_pos < baseline_pos, "cum_actual_cost must be computed BEFORE cum_baseline_cost"
+

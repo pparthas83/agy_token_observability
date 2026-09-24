@@ -1911,6 +1911,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                     )
                     if not df_turns.empty:
                         df_cost = df_turns.copy()
+                        df_cost["cum_actual_cost"] = df_cost["cost_usd"].cumsum()
                         if "model" in df_cost.columns:
                             df_cost["turn_saved"] = df_cost.apply(
                                 lambda row: (row["cached_tokens"] / 1_000_000.0) * get_cache_savings_rate(str(row.get("model", ""))),
@@ -2746,8 +2747,13 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
             )
 
 except Exception as e:
+    import traceback
     st.error(f"Error loading Token Observability dashboard: {e}")
-    st.info(
-        f"Make sure Cloud Run service account has BigQuery read permissions on {GCP_PROJECT}.{DATASET_ID}."
-    )
+    err_str = str(e).lower()
+    if any(k in err_str for k in ["permission", "accessdenied", "forbidden", "403", "404", "not found"]):
+        st.info(
+            f"Make sure Cloud Run service account has BigQuery read permissions on {GCP_PROJECT}.{DATASET_ID}."
+        )
+    with st.expander("🛠️ Error Diagnostics & Traceback", expanded=False):
+        st.code(traceback.format_exc())
 

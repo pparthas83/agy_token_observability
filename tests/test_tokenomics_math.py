@@ -85,3 +85,30 @@ def test_fmt_tok():
     assert fmt_tok(None) == "0"
     assert fmt_tok(1_500_000.0) == "1.50M"
     assert fmt_tok(50_000) == "50.0k"
+
+
+def test_financial_trajectory_cumulative_math():
+    import pricing
+
+    turns = [
+        {"step_index": 1, "cost_usd": 0.05, "cached_tokens": 10_000, "model": "gemini-3.8-flash"},
+        {"step_index": 2, "cost_usd": 0.02, "cached_tokens": 50_000, "model": "gemini-3.8-flash"},
+    ]
+
+    cum_actual = 0.0
+    cum_saved = 0.0
+    results = []
+    for t in turns:
+        cum_actual += t["cost_usd"]
+        saved = (t["cached_tokens"] / 1_000_000.0) * pricing.get_cache_savings_rate(t["model"])
+        cum_saved += saved
+        results.append({
+            "cum_actual_cost": round(cum_actual, 6),
+            "cum_baseline_cost": round(cum_actual + cum_saved, 6),
+        })
+
+    assert results[0]["cum_actual_cost"] == 0.05
+    assert results[1]["cum_actual_cost"] == 0.07
+    assert results[0]["cum_baseline_cost"] == 0.05675
+    assert results[1]["cum_baseline_cost"] == 0.1105
+
