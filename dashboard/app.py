@@ -18,6 +18,19 @@ try:
 except Exception:
     context_extractor = None
 
+try:
+    import pricing
+    format_step_cost = pricing.format_step_cost
+except Exception:
+    def format_step_cost(val):
+        if val is None or val <= 0:
+            return "$0.00", "$0.000000 USD (free tier / zero cost)"
+        val = float(val)
+        tip = f"Exact: ${val:,.6f} USD"
+        disp = f"${val:,.2f}" if val >= 0.01 else (f"${val:,.4f}" if val >= 0.0001 else f"${val:,.6f}")
+        return disp, tip
+
+
 # Resolve Antigravity Official Logo
 LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "antigravity_logo_clean.png")
 if os.path.exists(LOGO_PATH):
@@ -2006,6 +2019,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                     lat_ms = int(tr["latency_ms"]) if pd.notnull(tr["latency_ms"]) else "-"
                     speed = f"{float(tr['tokens_per_second']):.1f} tok/s" if pd.notnull(tr["tokens_per_second"]) and tr["tokens_per_second"] > 0 else "-"
                     step_c = float(tr["cost_usd"])
+                    step_c_disp, step_c_tip = format_step_cost(step_c)
 
                     cached_badge = f'<span class="pill pill-green">{cached_t:,}</span>' if cached_t > 0 else '<span style="color:#BDC1C6;">0</span>'
                     thinking_badge = f'<span class="pill pill-purple">{thk_t:,}</span>' if thk_t > 0 else '<span style="color:#BDC1C6;">0</span>'
@@ -2021,7 +2035,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                         <td style="font-family: 'Roboto Mono', monospace; color: #202124;">{out_t:,}</td>
                         <td style="font-size: 11px; color: #5F6368; font-family: 'Roboto Mono', monospace;">{lat_ms} ms</td>
                         <td style="font-size: 11px; color: #5F6368; font-family: 'Roboto Mono', monospace;">{speed}</td>
-                        <td style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace;">${step_c:,.2f}</td>
+                        <td title="{step_c_tip}" style="font-weight: 600; color: #202124; font-family: 'Roboto Mono', monospace; cursor: help;">{step_c_disp}</td>
                     </tr>
                     """)
 
@@ -2054,7 +2068,7 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                                         <th>Output Tokens</th>
                                         <th>Latency (TTFT)</th>
                                         <th>Throughput</th>
-                                        <th>Step Cost ($ USD)</th>
+                                        <th title="Exact blended cost per turn. Sub-cent micro-costs formatted with 4 decimals; hover to view exact 6-decimal rate.">Step Cost ($ USD)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2321,8 +2335,9 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                 turn_options,
                 index=def_turn_idx,
                 key="selected_telemetry_turn",
-                format_func=lambda s: f"Turn #{s} ({df_window.loc[df_window['step_index']==s, 'total_tokens'].values[0]:,} tokens | ${float(df_window.loc[df_window['step_index']==s, 'cost_usd'].values[0]):.4f})",
+                format_func=lambda s: f"Turn #{s} ({df_window.loc[df_window['step_index']==s, 'total_tokens'].values[0]:,} tokens | {format_step_cost(float(df_window.loc[df_window['step_index']==s, 'cost_usd'].values[0]))[0]})",
             )
+
 
         # 6. Extract metrics for selected turn
         turn_row = df_window[df_window["step_index"] == selected_step].iloc[0]

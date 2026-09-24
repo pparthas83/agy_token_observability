@@ -46,3 +46,43 @@ def test_calculate_cost_precision_and_rounding():
 
 def test_calculate_cost_zero_tokens():
     assert pricing.calculate_cost(0, 0, "gemini-3.8-flash") == 0.0
+
+
+def test_format_step_cost_subcent_microcosts():
+    # Micro-cost with context caching (Turn #3719)
+    disp, tip = pricing.format_step_cost(0.000432)
+    assert disp == "$0.0004"
+    assert tip == "Exact: $0.000432 USD"
+
+    # Micro-cost near 1 cent (Turn #3731 cache miss)
+    disp, tip = pricing.format_step_cost(0.009080)
+    assert disp == "$0.0091"
+    assert tip == "Exact: $0.009080 USD"
+
+
+def test_format_step_cost_standard_costs():
+    # 5 cents
+    disp, tip = pricing.format_step_cost(0.0512)
+    assert disp == "$0.05"
+    assert tip == "Exact: $0.051200 USD"
+
+    # $1.25 Pro heavy output
+    disp, tip = pricing.format_step_cost(1.254)
+    assert disp == "$1.25"
+    assert tip == "Exact: $1.254000 USD"
+
+
+def test_format_step_cost_edge_cases():
+    # Zero / free tier
+    disp, tip = pricing.format_step_cost(0.0)
+    assert disp == "$0.00"
+    assert "free tier" in tip
+
+    disp, tip = pricing.format_step_cost(None)
+    assert disp == "$0.00"
+
+    # Extreme sub-micro cost (< 0.0001)
+    disp, tip = pricing.format_step_cost(0.000045)
+    assert disp == "$0.000045"
+    assert tip == "Exact: $0.000045 USD"
+
