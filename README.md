@@ -209,7 +209,53 @@ A containerized, self-updating dashboard deployed to Google Cloud Run:
 
 ---
 
-## 6. BigQuery Telemetry Assets
+## 6. FinOps Pricing Engine & Cost Calculation Guide
+
+The telemetry engine models real-time inference expenditure using Google Cloud's official token rate cards. Per-turn cost calculations are computed purely by [`pricing.py`](pricing.py) and streamed directly to BigQuery.
+
+### 📐 Mathematical Formula
+
+For every execution turn ($i$), the estimated cost is computed as:
+
+$$\text{Step Cost (USD)} = \left(\frac{\text{Prompt Tokens}}{1{,}000{,}000} \times \text{Prompt Rate}\right) + \left(\frac{\text{Output Tokens}}{1{,}000{,}000} \times \text{Output Rate}\right)$$
+
+*Resulting step values are rounded to **6 decimal places** for granular micro-cost fidelity in BigQuery.*
+
+### 🏷️ Model Rate Cards (per 1 Million Tokens)
+
+| Model Family | Identifiers | Prompt Rate (per 1M) | Output Rate (per 1M) |
+| :--- | :--- | :---: | :---: |
+| **Gemini Flash** | `gemini-3.8-flash`, `gemini-2.5-flash`, `flash` | **\$0.15** | **\$0.60** |
+| **Gemini Flash-Lite** | `flash_lite` | **\$0.075** | **\$0.30** |
+| **Gemini Pro** | `gemini-3.8-pro`, `gemini-2.5-pro`, `pro` | **\$1.25** | **\$5.00** |
+| **Claude Sonnet** *(if routed)* | `claude-3.7-sonnet`, `claude-3.5-sonnet` | **\$3.00** | **\$15.00** |
+
+### ⚡ Context Caching Economics
+
+Antigravity aggressively leverages Gemini context caching for multi-turn sessions. In BigQuery telemetry:
+- **`prompt_tokens`**: Reflects the **uncached, billable prompt tokens** introduced in that specific turn.
+- **`cached_tokens`**: Reflects the **cached prefix tokens** reused from conversation history.
+
+#### Worked Examples:
+1. **Cache Hit Turn (e.g. Turn #3719)**:
+   * Prompt Tokens: `2,399` | Cached Tokens: `54,826` | Output Tokens: `101`
+   * $\text{Step Cost} = \left(\frac{2,399}{1{,}000{,}000} \times \$0.15\right) + \left(\frac{101}{1{,}000{,}000} \times \$0.60\right) = \mathbf{\$0.000420\text{ USD}}\; (\mathbf{\$0.0004})$
+2. **Cache Miss Turn (e.g. Turn #3731)**:
+   * Prompt Tokens: `60,104` | Cached Tokens: `0` | Output Tokens: `107`
+   * $\text{Step Cost} = \left(\frac{60,104}{1{,}000{,}000} \times \$0.15\right) + \left(\frac{107}{1{,}000{,}000} \times \$0.60\right) = \mathbf{\$0.009080\text{ USD}}\; (\mathbf{\$0.0091})$
+   * *Context caching delivered an immediate **21.6x cost reduction** on the hit turn.*
+
+### 🔍 Adaptive Precision Formatting
+
+To prevent micro-costs (such as $\$0.0004$) from misleadingly rounding to $\$0.00$ in UI tables while maintaining clean visual scanability:
+- **$\ge \$0.01$**: Formatted with 2 decimal places (e.g. `\$0.05`, `\$1.25`).
+- **$\$0.0001 \le \text{cost} < \$0.01$**: Formatted with 4 decimal places (e.g. `\$0.0004`, `\$0.0091`).
+- **$< \$0.0001$**: Formatted with 6 decimal places (e.g. `\$0.000045`).
+- **Exact Fidelity**: Hovering over any table cell or dropdown in the dashboard displays the full 6-decimal rate via native browser tooltips (`Exact: $0.000432 USD`).
+
+---
+
+## 7. BigQuery Telemetry Assets
 
 - **Project**: Target GCP Project (configured via `GCP_PROJECT` or ADC)
 - **Dataset**: `token_analytics` (Region: `US`)
@@ -222,7 +268,7 @@ A containerized, self-updating dashboard deployed to Google Cloud Run:
 
 ---
 
-## 7. Design System & UI Anti-Regression Framework
+## 8. Design System & UI Anti-Regression Framework
 
 The dashboard is built upon an enterprise **Google Cloud Console Design System** to deliver high data density, zero visual clipping, and responsive aesthetics.
 
@@ -237,7 +283,7 @@ The dashboard is built upon an enterprise **Google Cloud Console Design System**
 
 ---
 
-## 8. Author & Attribution
+## 9. Author & Attribution
 
 | Role | Contributor / Tool | Contact |
 | :--- | :--- | :--- |
@@ -251,7 +297,7 @@ If you are deploying this telemetry engine in your team or finding it valuable f
 
 ---
 
-## 9. License & Citation
+## 10. License & Citation
 
 - **License**: Distributed under the [Apache 2.0 License](LICENSE). Copyright © 2026 Pradeep Parthasarathy.
 - **Citation**: If you reference or build upon this work, please see the GitHub citation widget or reference [`CITATION.cff`](CITATION.cff).

@@ -2055,6 +2055,39 @@ Ranked breakdown across all {int(kpi['total_projects'])} workspace codebases
                             </div>
                             <span class="pill pill-blue">Last {len(df_table):,} Turns</span>
                         </div>
+                        <details class="cost-guide-drawer" style="margin-bottom: 14px; background: #F8F9FA; border: 1px solid #DADCE0; border-radius: 8px; padding: 10px 14px; font-family: 'Roboto', sans-serif; font-size: 12px; color: #3C4043;">
+                            <summary style="font-family: 'Google Sans', sans-serif; font-weight: 600; font-size: 12.5px; color: #1A73E8; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+                                <span>ℹ️ How Step Cost &amp; Cache Savings Are Calculated</span>
+                                <span style="font-size: 11px; font-weight: 400; color: #5F6368;">(Click to view formula, model rate cards &amp; cache economics)</span>
+                            </summary>
+                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #E8EAED; line-height: 1.6;">
+                                <div style="font-weight: 600; color: #202124; margin-bottom: 4px;">1. Mathematical Formula:</div>
+                                <div style="background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 4px; padding: 6px 12px; font-family: 'Roboto Mono', monospace; font-size: 11.5px; margin-bottom: 10px; color: #202124;">
+                                    Step Cost ($ USD) = (Prompt Tokens / 1,000,000 &times; Prompt Rate) + (Output Tokens / 1,000,000 &times; Output Rate)
+                                </div>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 10px;">
+                                    <div style="background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 6px; padding: 8px 12px;">
+                                        <div style="font-weight: 600; color: #1A73E8; font-size: 11.5px; margin-bottom: 4px;">Official Rate Cards (per 1M Tokens)</div>
+                                        <ul style="margin: 0; padding-left: 18px; font-size: 11px; color: #3C4043;">
+                                            <li><strong>Gemini 3.8 / 2.5 Flash</strong>: $0.15 prompt / $0.60 output</li>
+                                            <li><strong>Gemini Flash-Lite</strong>: $0.075 prompt / $0.30 output</li>
+                                            <li><strong>Gemini 3.8 / 2.5 Pro</strong>: $1.25 prompt / $5.00 output</li>
+                                            <li><strong>Claude 3.7 Sonnet</strong>: $3.00 prompt / $15.00 output</li>
+                                        </ul>
+                                    </div>
+                                    <div style="background: #FFFFFF; border: 1px solid #DADCE0; border-radius: 6px; padding: 8px 12px;">
+                                        <div style="font-weight: 600; color: #1E8E3E; font-size: 11.5px; margin-bottom: 4px;">Context Caching Economics &amp; Precision</div>
+                                        <div style="font-size: 11px; color: #3C4043;">
+                                            &bull; <strong>Cache Hits</strong>: When previous turns are cached, only new uncached prompt tokens are billed, dropping cost to <strong>~$0.0004</strong>.<br>
+                                            &bull; <strong>Adaptive Precision</strong>: Costs &ge; $0.01 show 2 decimals ($0.05); sub-cent micro-costs show 4 decimals ($0.0004). Hover over any cell to see exact 6-decimal rate.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 11px; color: #5F6368;">
+                                    <strong>Cache Savings Formula:</strong> Cumulative Cache Savings = Gross Cost (all prompt tokens billed at uncached rate) &minus; Net Actual Spend.
+                                </div>
+                            </div>
+                        </details>
                         <div class="gcp-scrollable-table">
                             <table class="gcp-table">
                                 <thead>
